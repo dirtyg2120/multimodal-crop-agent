@@ -1,0 +1,73 @@
+flowchart LR
+
+    %% INPUT
+    A0([User / Camera]) --> A1[Pydantic AI Agent]
+
+    %% OBSERVE
+    subgraph S1 [OBSERVE - Preprocessing and Detection]
+        A1 --> B1[Image Quality Gate]
+
+        B1 -->|OK| B3[Resolution Check]
+        B3 -->|High-res| B4[SAHI Tiling]
+        B3 -->|Low-res| B5[Standard Inference]
+
+        B4 --> C1
+        B5 --> C1
+
+        C1[Grounding DINO - Zero-shot Detection]
+        C1 --> C2{Object Type}
+    end
+
+    %% VERIFY
+    subgraph S2 [VERIFY - Hybrid CLIP Logic]
+        C2 -->|Insect| D1[Insect Crop]
+        C2 -->|Leaf| D2[Leaf Crop]
+
+        subgraph S2a [Insect Verification]
+            D1 --> E1[Specialist CLIP]
+            E1 -->|Conf >= 0.70| E2[Verified Insect Label]
+            E1 -->|Conf < 0.70| E3[Base CLIP - Visual Description]
+        end
+
+        subgraph S2b [Leaf Verification]
+            D2 --> F1[Specialist CLIP]
+            F1 -->|Conf >= 0.70| F2[Verified Disease Label]
+            F1 -->|Conf < 0.70| F3[Base CLIP - Visual Description]
+        end
+
+        E2 --> G1
+        E3 --> G1
+        F2 --> G1
+        F3 --> G1
+
+        G1[Observation Summary]
+    end
+
+    %% REASON
+    subgraph S3 [REASON - RAG and Reasoning]
+        G1 --> H1{Crop Type}
+
+        H1 -->|Tomato| H2[Tomato Vector DB]
+        H1 -->|Corn| H3[Corn Vector DB]
+        H1 -->|Other| H4[Other Crop DBs]
+
+        H2 --> I1
+        H3 --> I1
+        H4 --> I1
+
+        I1[ChromaDB Retrieval]
+        I1 --> J1[Llama - RAG Core]
+        G1 --> J1
+        J1 --> K1[GPT-4o - Final Reasoning]
+    end
+
+    %% ACT
+    subgraph S4 [ACT - Structured Output]
+        K1 --> L1[Pydantic AI Schema Validation]
+        L1 --> M1[Streamlit UI]
+        L1 --> M2[IoT or API Outputs]
+    end
+
+    %% LOOP
+    M1 -->|Need More Evidence| A1
+
