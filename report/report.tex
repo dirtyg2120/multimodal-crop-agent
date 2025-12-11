@@ -1,0 +1,242 @@
+\documentclass[twoside,a4paper,12pt]{book}
+\usepackage{pdfpages}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{pgf}
+\usepackage{etoolbox}
+%\usepackage{mathptmx}
+%\usepackage{fontspec}
+%\setmainfont{Times New Roman}
+
+% Layout
+\usepackage{ragged2e}
+\usepackage{subcaption}
+\usepackage{multicol}
+\usepackage{nopageno}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\usepackage[margin=1in]{geometry}
+\usepackage[left=3cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{pdflscape}
+%\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\usepackage{indentfirst}
+
+\makeatletter
+\newcommand\mynobreakpar{\par\nobreak\@afterheading} 
+\makeatother
+
+% Symbols
+\usepackage{amssymb}
+\usepackage{pifont}
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\usepackage{newtxmath}
+
+% Heading
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage[raggedright]{titlesec}
+\titleformat{\paragraph}[hang]{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titlespacing*{\paragraph}{0pt}{3.25ex plus 1ex minus .2ex}{0.5em}
+
+% Float environment
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\makeatletter
+\renewcommand*{\fps@figure}{htbp}
+\renewcommand*{\fps@table}{htbp}
+\makeatother
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{caption}
+\captionsetup[figure]{font=small}
+\usepackage[export]{adjustbox}
+
+% Table
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{multirow}
+\usepackage{longtable}
+%\renewcommand\tabularxcolumn[1]{m{#1}}% for vertical centering text in X column
+\renewcommand\theadfont{\bfseries}
+\renewcommand\cellalign{tl}
+\renewcommand\cellgape{\gape}
+%\renewcommand{\arraystretch}{2}
+\usepackage{rotating}
+\usepackage{siunitx}
+%\sisetup{parse-numbers = false,input-decimal-markers={-},output-decimal-marker = \text{--}}
+
+%\usepackage{xcolor}
+\usepackage{enumitem}
+\setlist{nosep,topsep=0pt}
+
+% Math
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\usepackage{commath}
+\usepackage{empheq}
+\usepackage{amsmath,amssymb}
+\renewcommand*{\vec}[1]{#1}
+\newcommand{\mat}[1]{#1}
+\newcommand{\dpd}[2]{\frac{\partial{#1}}{\partial{#2}}}
+\DeclareMathOperator{\MSG}{MSG}
+\DeclareMathOperator{\AGG}{AGG}
+\DeclareMathOperator{\SUM}{SUM}
+\DeclareMathOperator{\MEAN}{MEAN}
+\DeclareMathOperator{\MAX}{MAX}
+
+% Code
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\usepackage{algorithm}
+%\usepackage{algorithmic}
+
+\usepackage{minted}
+\usemintedstyle{solarized-light}
+\setminted[]{frame=single, tabsize=4, samepage}
+%\setminted[rout]{
+	%    bgcolor = Routbackground,
+	%    framerule=0.2pt,framesep=1pt
+	%}
+
+%\usepackage{listings}
+%\usepackage{xcolor}
+%\definecolor{codegreen}{rgb}{0,0.6,0}
+%\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+%\definecolor{codepurple}{rgb}{0.58,0,0.82}
+%\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+%\lstdefinestyle{mystyle}{
+	%    backgroundcolor=\color{backcolour},   
+	%    commentstyle=\color{codegreen},
+	%    keywordstyle=\color{magenta},
+	%    numberstyle=\tiny\color{codegray},
+	%    stringstyle=\color{codepurple},
+	%    basicstyle=\ttfamily\footnotesize,
+	%    breakatwhitespace=false,         
+	%    breaklines=true,                 
+	%    captionpos=b,                    
+	%    keepspaces=true,                 
+	%    numbers=left,                    
+	%    numbersep=5pt,                  
+	%    showspaces=false,                
+	%    showstringspaces=false,
+	%    showtabs=false,                  
+	%    tabsize=2
+	%}
+%\lstset{style=mystyle}
+
+% Header and footer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\usepackage{fancybox}
+\fancypagestyle{empty}{%
+	\fancyhf{}%
+	\renewcommand{\headrulewidth}{0pt}%
+	\renewcommand{\footrulewidth}{0pt}%
+	%\setlength{\headheight}{0pt}%
+}
+\fancypagestyle{open}{%
+	\fancyhf{}%
+	%\fancyfoot{} % clear all footer fields
+	\fancyfoot[L]{\scriptsize \ttfamily Graduation Thesis, Semester 212, Academic year 2021 - 2022}
+	\fancyfoot[R]{\scriptsize \ttfamily Page {\thepage}/\pageref{LastPage}}
+	\renewcommand{\headrulewidth}{0pt}
+	\renewcommand{\footrulewidth}{0.3pt}
+	
+}
+\fancypagestyle{myfancy}{%
+	\fancyhf{}
+	\setlength{\headheight}{24.5pt}
+	\fancyhead[L]{
+		\begin{tabular}{rl}
+			\begin{picture}(25,15)(0,0)
+				\put(0,-8){\includegraphics[width=8mm, height=8mm]{image/HCMUT_official_logo.png}}
+			\end{picture} &
+			\begin{tabular}{l}
+				\textbf{\bf \ttfamily Ho Chi Minh City University of Technology}\\
+				\textbf{\bf \ttfamily Faculty of Computer Science and Engineering}
+			\end{tabular}
+		\end{tabular}
+	}
+	\fancyhead[R]{
+		\begin{tabular}{l}
+			\tiny \bf \\
+			\tiny \bf
+		\end{tabular}
+	}
+	\fancyfoot[L]{\scriptsize \ttfamily Graduation Thesis, Semester 2, Academic year 2021 - 2022}
+	\fancyfoot[R]{\scriptsize \ttfamily Page {\thepage}/\pageref{LastPage}}
+	\renewcommand{\headrulewidth}{0.3pt}
+	\renewcommand{\footrulewidth}{0.3pt}
+}
+
+\usepackage{xurl}
+% Hyperref must be loaded last!
+%\PassOptionsToPackage{hyphens}{url}
+\usepackage[
+colorlinks=true,
+allcolors=blue,
+linkcolor=black,
+breaklinks=true,
+]{hyperref}
+
+\begin{document}
+	\frontmatter
+	\input{titlepage}
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\chapter*{\centering{Declaration of Authenticity}}
+	We declare that this research is our own work, conducted under the supervision and guidance of Assoc. Prof. Nguyen Manh Hung. The result of our research is legitimate and has not been published in any forms prior to this. All materials used within this researched are collected ourself by various sources and are appropriately listed in the references section. \\
+	
+	In addition, within this research, we also used the results of several other authors and organizations. They have all been aptly referenced. \\
+	
+	In any case of plagiarism, we stand by our actions and will be responsible for it. Ho Chi Minh City University of Technology therefore are not responsible for any copyright infringements conducted within our research. \\[20pt]
+	\begin{flushright}
+		Ho Chi Minh City, December 2025 \\
+		Authors \\
+		Tran Quoc Anh \\
+	\end{flushright}
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\chapter*{\centering{Acknowledgment}}
+	We would like to acknowledge and express our gratitude to everyone who have supported us during our university life. Not only the professors in Ho Chi Minh City University of Technology who have taught us immense knowledge and given us their aspiring guidance, invaluable constructive criticism and friendly advice, but also our friends and our family members of each member in our team who let us have a good physical and mental health during our study.
+	
+	Foremost, we would like to give our sincere gratitude to our supervisor, Associate Professor Ph.D Nguyen Manh Hung as well as our mentors for their continuous support. Their guidance has brought up our motivation and enthusiasm in research for this thesis. We could not have imagined having a better support for our study.
+	
+	Last but not least, we would like to thank Ho Chi Minh City University of Technology for giving us the opportunity to learn great lessons of theory and practical experience in the field of Computer Science.
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\chapter*{\centering{Abstract}}
+	Online social networks, such as Twitter and Facebook, have become an important part of people's daily lives in recent years since they allow them to connect with others, communicate with friends, share personal content with others, and obtain information, especially during the ongoing worldwide disaster---the COVID-19 pandemic. However, it also creates opportunities for social bots that are designed to replicate the behaviors of normal human accounts. Most of these bots are used for nefarious purposes such as disseminating false information, artificially amplifying the popularity of a person or movement or spreading spam. This proposal presents a review of some techniques that have emerged and designed to differentiate between social bot accounts and human accounts. We restrict the analysis to the detection of social bots on the Twitter social media platform for the time being, with plans to expand to Facebook later. We also compare the experiments of each technique on two different data sets to point out the most accurate one. Besides experimenting, our final destination is to develop a social bot detection tool that can be deployed as a web application. Finally, we highlight the challenges that remain in the domain of social bots detection and consider future directions for research efforts that are designed to address this problem.
+	
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\tableofcontents
+	\thispagestyle{empty}
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\listoffigures
+	\thispagestyle{empty}
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\listoftables
+	\thispagestyle{empty}
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\mainmatter
+	\pagestyle{myfancy}
+	\begingroup
+	\input{intro.tex}
+	\input{theory.tex}
+	\input{works.tex}
+	\input{method.tex}
+	\input{data.tex}
+	\input{app.tex}
+	\input{result.tex}
+	
+	% \begin{center}
+		% \textbf{\emph{To anyone reading this. Thank you for your time.}}
+		% \end{center}
+	
+	%\backmatter
+	%\nocite{*}
+	\pagestyle{plain}
+	\bibliography{ref}
+	\bibliographystyle{plain}
+	
+\end{document} 
