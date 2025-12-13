@@ -11,5 +11,8 @@ wheels/
 clip-vit-large-patch14-plant-disease-finetuned/
 .assets
 .env
+
+# My Folder
 data/manuals
 data/chroma_db
+report/report.*
