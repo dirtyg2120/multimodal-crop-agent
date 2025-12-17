@@ -3,7 +3,7 @@
 \thispagestyle{open}
 
 \section{Deep Learning in Computer Vision}
-\subsection{The Evolution: CNNs to Transformers}
+\subsection{CNNs to Transformers}
 % Since the success of AlexNet in 2012\cite{russakovsky2015ilsvrc}
 Since 2012, Convolutional Neural Networks (CNNs) have formed the backbone of most computer vision systems. Successive architectures, including VGG\cite{simonyan2014vgg}, ResNet\cite{he2016resnet}, and EfficientNet\cite{tan2019efficientnet}, consistently achieved strong performance on large-scale benchmarks such as ImageNet\cite{russakovsky2015ilsvrc} and COCO\cite{lin2014coco}. Besides that, CNN-based detectors like YOLO\cite{redmon2016yolo} became widely adopted in real-time applications due to their computational efficiency. CNNs are built to focus on local patterns and recognize them anywhere, which makes them efficient, lightweight, and ideal for running on edge devices.
 
@@ -18,9 +18,9 @@ There are two primary implications for modern vision systems: \begin{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection{The Core Problem: Closed-Set vs. Open-Set Detection}
+\subsection{Closed-Set vs. Open-Set Detection}
 
-Conventional object detectors, from two-stage models like Faster R-CNN\cite{fasterrcnn_ren2015} to one-stage architectures like YOLO, typically operate in a closed-set setting. These models learn a mapping from an image to a fixed, finite set of categories $\mathcal{Y}_{\text{known}}$ (e.g., the 80 classes in MS COCO)\cite{lin2014coco}. At test time, the model implicitly assumes that all visible objects belong to this known set. Any object outside this taxonomy—such as a rare pest or a novel disease symptom—is either forced into a known class (misclassification) or treated as background (suppression).
+Conventional object detectors, from two-stage models like Faster R-CNN\cite{fasterrcnn_ren2015} to one-stage architectures like YOLO, typically operate in a closed-set setting. These models learn a mapping from an image to a fixed, finite set of categories $\mathcal{Y}_{\text{known}}$ (e.g., the 80 classes in MS COCO)\cite{lin2014coco}. At test time, the model implicitly assumes that all visible objects belong to this known set. Any object outside this taxonomy - such as a rare pest or a novel disease symptom - is either forced into a known class (misclassification) or treated as background (suppression).
 
 \emph{Open-set object detection} (OSOD) generalizes this formulation. It requires a model to (i) accurately classify instances from $\mathcal{Y}_{\text{known}}$, while (ii) acknowledging inputs from $\mathcal{Y}_{\text{unknown}}$ without overconfident misclassification.\cite{dhamija2020openset} While early OSOD work focused on rejecting unknowns, recent advances in \emph{open-vocabulary} models provide a more flexible solution. By leveraging large-scale vision--language pre-training (e.g., CLIP), these models replace fixed classification layers with text-embedding similarity scores.\cite{radford2021clip,zhu2024surveyovd} This allows a detector not just to reject an unknown object, but to localize it based on descriptive text prompts (e.g.,``necrotic lesion with yellow halo'') that were never seen during training.
 
@@ -31,14 +31,91 @@ In this thesis, we address this limitation by operationalizing crop health monit
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Grounding DINO}
-Grounding DINO is an object detection model capable of detecting any object. By inputting the object you want to detect in text, you can obtain the bounding box for that object within an image.
-\subsection{Detection Transformers (DETR)}
+Grounding-DINO\cite{liu2023grounding} is a popular large vision-language model equipped with open-set object detection capabilities. It is designed to overcome the constraints of fixed-class detectors by recognizing novel objects defined solely by natural language input. The model achieves this by combining the high-performance transformer-based detection architecture of DINO with the grounded language-image pre-training methodology of GLIP. This integration allows Grounding DINO to perform zero-shot detection by aligning visual features with textual descriptions at a foundational level.
+\subsection{DETR}
+DETR (Detection Transformer) \cite{DBLP:journals/corr/abs-2005-12872} is a deep learning model that fundamentally shifts object detection from a regression and classification task to a direct set prediction problem. By combining the Transformer architecture with self-attention mechanisms, DETR captures global context and long-range dependencies across the image, addressing limitations of CNN-based methods that primarily focus on local features. Furthermore, its set-based prediction mechanism utilizing bipartite matching eliminates the need for hand-crafted anchors and complex post-processing steps like Non-Maximum Suppression (NMS), streamlining the pipeline into an end-to-end process.
 
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{images/detr.png}
+	\caption{DETR architecture \cite{DBLP:journals/corr/abs-2005-12872}.}
+	\label{fig:detr}
+\end{figure}
+
+To achieve this, the DETR architecture follows a streamlined pipeline:
+\begin{itemize}
+	\item \textbf{Backbone:} The input image is processed by a CNN to extract a low-resolution feature map. Positional encodings are added to these features to preserve the spatial structure that Transformers otherwise ignore.
+	\item \textbf{Encoder:} The flattened features are passed through a Transformer Encoder. Here, self-attention layers aggregate information from across the entire image, enriching each pixel's representation with global context.
+	\item \textbf{Decoder:} The Decoder utilizes learned object queries - vectors representing potential objects - to interact with the encoded image features. It reasons about the relations between objects and the global image context.
+	\item \textbf{Prediction Heads:} Finally, the decoder output is passed to Feed-Forward Networks (FFNs) that predict class labels and bounding box coordinates for each query. If no object is detected for a specific query, it is assigned a "no object" class.
+\end{itemize}
+
+Despite its conceptual advantages, the vanilla DETR architecture faces significant limitations, specifically regarding slow convergence rates and difficulties in processing high-resolution images.
 \subsection{DINO}
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{images/dino.png}
+	\caption{DINO Architecture (Source: Internet).}
+	\label{fig:dino}
+\end{figure}
+DINO (DETR with Improved deNoising anchOr boxes) builds upon the standard DETR framework by integrating specific architectural enhancements designed to optimize convergence speed and detection performance on high-resolution inputs. These improvements focus on two primary areas: attention efficiency and query stability.
 
+\textbf{Multi-Scale Deformable Attention} \\
+To process high-resolution feature maps efficiently, DINO adopts the Deformable Attention mechanism from Deformable DETR. Unlike global self-attention, which computes dependencies across all spatial locations resulting in quadratic computational complexity - deformable attention restricts the attention field to a small set of learned sampling points around a reference. This sparse attention mechanism allows the model to capture fine-grained details for small object detection without incurring prohibitive computational costs.
+
+\textbf{Query Optimization and Denoising} \\
+DINO mitigates the convergence latency of the original DETR through two complementary strategies:
+\begin{itemize}
+	\item \textbf{Dynamic Anchor Boxes (DAB-DETR):} Static object queries are replaced with dynamic anchor boxes. These anchors explicitly formulate the query position as dynamic spatial priors (coordinates and scale), clarifying the spatial relationship between the query and the target features.
+	\item \textbf{Contrastive Denoising Training (DN-DETR):} To stabilize the bipartite matching process, DINO introduces a denoising training task. The model is fed "noisy" ground-truth bounding boxes and trained to reconstruct the original coordinates. This auxiliary task reduces the ambiguity of bipartite matching during early training phases, significantly accelerating convergence.
+\end{itemize}
 \subsection{GLIP and Grounded Pre-Training}
+Grounding DINO extends the capabilities of standard detection by incorporating language supervision, enabling ``zero-shot'' detection where the model can identify objects based on arbitrary text descriptions without re-training. This relies on the methodology introduced by GLIP, which reformulates object detection as a \textbf{phrase grounding} task, replacing fixed class IDs with alignable word embeddings.
 
+The model's generalization capability stems from a diverse combination of datasets during pre-training:
+\begin{itemize}
+	\item \textbf{Detection Data (e.g., Object365, LVIS):} Provides standard bounding boxes and class labels to maintain localization precision.
+	\item \textbf{Caption Data (e.g., Cap24M):} Offers detailed textual descriptions of images to expand the semantic vocabulary.
+	\item \textbf{Grounded Data (e.g., RefCOCO):} Crucially, this data links specific phrases in a sentence to specific image regions. This bridges the gap between visual features and linguistic semantics, allowing the model to learn the association between textual concepts and visual patterns directly.
+\end{itemize}
 \subsection{Grounding DINO Architecture}
+The Grounding DINO architecture is designed to process image-text pairs simultaneously to achieve open-set detection. As illustrated in Figure \ref{fig:grounding_dino}, the model comprises several key components: a dual-backbone feature extractor, a feature enhancer for multi-modal fusion, a language-guided query selection module, and a cross-modality decoder.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{images/grounding_dino_arch.png}
+	\caption{The framework of Grounding DINO \cite{liu2023grounding}.}
+	\label{fig:grounding_dino_arch}
+\end{figure}
+
+\textbf{Feature Extraction and Encoding} \\
+The model processes the input image and text prompt through separate backbones:
+\begin{itemize}
+	\item \textbf{Image Backbone:} A Swin Transformer \cite{liu2021swin} is employed to extract hierarchical visual features from different layers, capturing multi-scale visual information.
+	\item \textbf{Text Backbone:} The text prompt is tokenized using Byte-Pair Encoding (BPE) and encoded by a BERT model \cite{devlin2018bert}. This produces a sequence of text embeddings with dimension $N \times 768$, where $N$ is the number of tokens.
+\end{itemize}
+
+\textbf{Feature Enhancer Module} \\
+To bridge the gap between modalities, the raw image and text embeddings are fed into a Feature Enhancer. This module consists of multiple layers employing both self-attention and bi-directional cross-attention mechanisms. These layers facilitate deep interaction between text-to-image and image-to-text contexts, ensuring that the visual features are contextually aware of the linguistic prompts before detection begins.
+
+\textbf{Language-Guided Query Selection} \\
+Unlike standard DETR which uses learned static queries, Grounding DINO initializes object queries based on the input text. The model calculates the dot product between the enhanced text and image features to generate similarity scores. It then selects the top $N_I$ image features with the highest scores to serve as the initial object queries. This ensures the queries are relevant to the specific objects mentioned in the text prompt.
+
+\textbf{Sub-Sentence Level Representation} \\
+Grounding DINO refines how text is processed by introducing a ``sub-sentence'' level representation. Previous methods either compressed an entire sentence into a single feature (losing fine-grained detail) or allowed all words to interact indiscriminately, which created unnecessary dependencies between unrelated category names. To solve this, Grounding DINO employs attention masks within the text encoder. These masks selectively block the attention mechanism, preventing unrelated categories from influencing each other. This ensures the model retains precise, per-word features necessary for fine-grained understanding without introducing noise from irrelevant word associations.
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.9\textwidth]{images/text_feature.png}
+	\caption{Comparisons of text representations  \cite{liu2023grounding}.}
+	\label{fig:text_feature}
+\end{figure}
+
+\textbf{Cross-Modality Decoder and Training Objectives} \\
+The selected queries are fed into a cross-modality decoder. Here, query features undergo self-attention followed by cross-attention with both the image and text feature maps to refine the object representations.
+\begin{itemize}
+	\item \textbf{Prediction:} The output queries predict bounding boxes and class probabilities based on their similarity to the text features.
+	\item \textbf{Loss Functions:} Training optimizes a combination of losses using bipartite matching. Classification utilizes a \textbf{contrastive loss}, where the dot product between query and text features produces logits optimized via Focal Loss \cite{lin2017focal}. Bounding box regression is supervised using L1 loss and Generalized IoU (GIoU) loss \cite{rezatofighi2019giou}.
+\end{itemize}
 
 %Grounding-DINO is a popular large vision-language model equipped with open-set object detection capabilities. This enables the recognition of novel objects outside the initially defined categories.
 %As shown in Figure 2, the Grounding-DINO model processes an image along with a text prompt corresponding to each class. The model comprises several key components:
@@ -49,14 +126,100 @@ Grounding DINO is an object detection model capable of detecting any object. By 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{CLIP}
-
+CLIP is a neural network adept at grasping visual concepts through natural language supervision. It operates by concurrently training a text encoder and an image encoder, focusing on a pre-training task that involves matching captions with corresponding images. This architecture allows CLIP to adapt to a variety of visual classification benchmarks seamlessly. It does so by simply receiving the names of the visual categories to be recognized.
 \subsection{Learning from Unstructured Data}
+Traditional computer vision models have depended on supervised learning methods that need high-quality, human-annotated datasets. In standard benchmarks, models are trained to predict a fixed set of predetermined categories, which are manually verified for accuracy. While effective for closed-set tasks, this approach has two limitations: the high cost of scaling manual annotation to new domains and the inability of the model to generalize beyond its training taxonomy.
 
+CLIP resolves these limitations by changing from crowd-sourced labeling to natural language supervision. Instead of relying on a restricted ontology of categorical labels , CLIP learns from a massive dataset of 400 million image-text pairs collected from the public internet (WebImageText). 
+
+This method makes use of the semantic richness of unstructured text found on the web. By treating natural language descriptions as labels, the model is not confined to a static list of IDs but instead learns to associate visual features with a vast array of linguistic concepts. This transition enables the model to generalize unseen categories without task-specific retraining.
+
+\subsection{Contrastive Learning}
+At the core of CLIP is a contrastive learning objective designed to align visual and textual representations into a shared embedding space. Unlike traditional classification tasks that map images to discrete labels, CLIP solves a proxy task of predicting which text description matches which image within a given batch.
+
+For a batch of $N$ (image, text) pairs, the model constructs an $N \times N$ similarity matrix by computing the cosine similarity between all image and text embeddings. The training objective is to maximize the similarity scores of the $N$ correct pairings (the diagonal of the matrix) while minimizing the scores of the $N^2 - N$ incorrect pairings (the off-diagonal elements). This forces the model to learn a multi-modal embedding space where semantically similar images and texts are located close to each other.
+
+This alignment is optimized using a symmetric cross-entropy loss over the similarity scores. Formally, for an image embedding $I_i$ and a text embedding $T_i$, the loss function for the image-to-text direction is defined as:
+
+\begin{equation}
+	\mathcal{L}_{i}^{(I \rightarrow T)} = -\log \frac{\exp(\text{sim}(I_i, T_i) / \tau)}{\sum_{j=1}^{N} \exp(\text{sim}(I_i, T_j) / \tau)}
+\end{equation}
+
+where $\tau$ is a learnable temperature parameter that scales the logits. A symmetric loss $\mathcal{L}^{(T \rightarrow I)}$ is calculated for the text-to-image direction, and the total loss is the average of these two components.
 \subsection{Dual Encoders}
-- Image Encoder
-- Text Encoder
-\subsection{Contrastive Learning (The Core)}
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.9\textwidth]{images/dual_encoder.png}
+	\caption{Text Encoder \& Image Encoder (Source: Internet).}
+	\label{fig:dual_encoder}
+\end{figure}
+CLIP processes two independent neural networks to process visual and textual inputs in parallel as show in Figure \ref{fig:dual_encoder}. 
+\begin{itemize}
+	\item \textbf{Image Encoder} (typically a Vision Transformer like ViT-B/32) maps images to feature vectors
+	\item \textbf{Text Encoder} (a standard Transformer) processes natural language prompts.
+\end{itemize}
+Both encoders must project their outputs into a shared embedding space of identical dimension $d$ via a learned linear layer. This dimensional alignment is important, as it allows the vectors from these different modalities to be compared directly using the dot product, enabling the contrastive mechanism described previously.
 
 \subsection{Zero-Shot Inference}
 
-\subsection{Visual Verification}
+Zero-shot inference enables the model to predict classes that were not explicitly encountered during training. This is achieved by synthesizing a linear classifier directly from natural language descriptions.
+
+At inference time, the names of the target categories (e.g., "healthy", "early blight") are inserted into a prompt template, such as "A photo of a \{label\}." These prompts are processed by the Text Encoder to generate a set of class embeddings $\{T_1, T_2, \dots, T_K\}$. Simultaneously, the input image is mapped to a feature vector $I$ by the Image Encoder.
+
+Classification is performed by computing the cosine similarity between the image vector $I$ and the set of text vectors. The predicted class is simply the one whose text embedding maximizes the dot product with the image embedding:
+
+\begin{equation}
+	\hat{y} = \arg\max_{k} (\text{sim}(I, T_k))
+\end{equation}
+
+This mechanism effectively treats the text embeddings as the dynamic weights of a classifier, allowing the model to adapt to any open-set taxonomy solely by modifying the input text prompts.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Large Language Models (LLMs) \& Reasoning}
+\subsection{Generative Transformer Architecture}
+Large Language Models (LLMs) are defined as transformer-based models scaled to billions of parameters. Unlike earlier architectures that process an entire sentence at once (like BERT), modern LLMs primarily use a decoder-only architecture. This design processes text sequentially—reading from left to right—to generate coherent responses token by token.
+
+\textbf{Pre-training}
+
+Next Token Prediction The fundamental "engine" of these models is built during a massive pre-training phase. The model reads vast amounts of text and learns to solve a single objective: Next Token Prediction. Here is how it works by steps:
+\begin{enumerate}
+	\item Given a sequence of words (e.g., "The crop leaves are turns..."), the model calculates the probability of the most likely next word (e.g., "yellow").
+	\item By repeating this billions of times, the model develops a deep statistical understanding of language, grammar, and facts.
+\end{enumerate}
+
+\textbf{Instruction Tuning \& Alignment}
+
+While pre-training teaches the model how to speak, it does not teach it to follow orders. A raw pre-trained model might just continue a sentence rather than answer a question. To fix this, modern models undergo a second training phase called Instruction Tuning (Ouyang et al., 2022). This ``fine-tuning'' step teaches the model to understand user intents and generate helpful, safe responses rather than just random text completions.
+
+\subsection{Chain-of-Thought (CoT) Reasoning}
+%ref: https://www.ibm.com/think/topics/chain-of-thoughts#f1
+Chain of thought (CoT) \cite{CoT} is a prompt engineering technique that enhances the output of large language models (LLMs), particularly for complex tasks involving multistep reasoning. It facilitates problem-solving by guiding the model through a step-by-step reasoning process by using a coherent series of logical steps. Instead of giving a final answer immediately, the model generates middle reasoning steps. This process allows the model to think more, breaking down a complex problem into smaller, clearer parts before concluding.
+
+Reasoning is often considered an ``emergent ability'', meaning it appears naturally as the size and complexity of a model increase. Larger models tend to perform better at this because they have learned more patterns from massive datasets. However, increasing model size is not the only way to improve this. Advances in "instruction tuning" now allow smaller models to perform CoT reasoning effectively by training them on examples of how to respond step-by-step.
+
+%In this report, CoT is applied during the agent's ``Verify'' phase. Rather than allowing the model to guess a crop diagnosis instantly, the system prompts it to list its observations first. By following this logical chain—identifying symptoms first, then comparing them to data—the agent produces more accurate and reliable results.
+\subsection{Retrieval-Augmented Generation (RAG)}
+Retrieval-Augmented Generation \cite{RAG} is an artificial intelligence (AI) application that connects a generative AI model with an external knowledge base. The data in the knowledge base augments user queries with more context so the LLM can generate more accurate responses. RAG enables LLMs to be more accurate in domain-specific contexts without needing fine-tuning.
+
+\textbf{Vector Embeddings} 
+
+To retrieve this information, the system must first understand the "meaning" of the text. This is done using Vector Embeddings, which map text into a high-dimensional numerical space. For example, OpenAI’s text-embedding-3-small model converts a sentence into a vector of 1,536 numbers. In this space, concepts that are semantically similar (like ``yellow leaves'' and ``nitrogen deficiency'') are located close to each other, even if they do not share the exact same words.
+
+\textbf{Vector Indexing}
+
+Finding the closest matching vector among millions of documents can be slow if done one by one. To solve this, vector databases (like ChromaDB) use an algorithm called Hierarchical Navigable Small World (HNSW)\cite{hnsw}, HNSW organizes data into a multi-layered graph structure. This allows the system to quickly zoom in on the relevant neighborhood of data points rather than scanning the entire database, ensuring the agent retrieves information almost instantly.
+
+\textbf{Semantic Search Metrics}
+
+The relevance of a document is measured using Cosine Similarity. This metric calculates the angle between the query vector and the document vector. If the score is close to 1, it means the documents have almost the same meaning; if it is close to 0, it means they are unrelated. The agent uses this score to rank the retrieved documents and select only the most relevant evidence to verify its diagnosis.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Agentic AI Frameworks}
+
+\subsection{The ReAct Paradigm}
+A ReAct agent is an AI agent that uses the “reasoning and acting” (ReAct) framework to combine chain of thought (CoT) reasoning with external tool use. The ReAct framework enhances the ability of a large language model (LLM) to handle complex tasks and decision-making in agentic workflows.
+\subsection{Neuro-Symbolic Integration (Structured Outputs)}
+
+\subsection{Control Flow: Workflows vs. Agents}

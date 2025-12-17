@@ -1,3 +1,48 @@
 \chapter{Related Works}
 \label{chap:works}
 \thispagestyle{open}
+%\section{The Big Picture of AI in Agriculture}
+\section{The Big Picture of AI in Crop Health Management}
+Recent surveys show that AI for agriculture has evolved from feature-engineered machine vision and classical machine learning to deep learning perception systems deployed on UAV/edge platforms, and more recently toward foundation-model and LLM-based decision support. Liakos et al.~\cite{liakos2018ml_agri} reviewed machine learning applications across agricultural production systems, while Kamilaris and Prenafeta-Boldú~\cite{kamilaris2018dl_agri} summarized early deep learning adoption in agriculture. More recent overviews emphasize practical constraints such as dataset bias, domain shift, and deployment challenges in real farms~\cite{xu2024datasets_pdr,batool2025vision_disease_review,zhao2025leaf_disease_review}.
+
+From the viewpoint of crop health management (disease/pest/stress monitoring and recommendations), the literature can be grouped into: (i) sensor and remote-sensing driven monitoring, (ii) feature-engineered machine learning pipelines, (iii) supervised deep learning for classification/detection/segmentation (including the ``YOLO era'' for real-time detection), (iv) open-set/open-world recognition to handle unknown diseases/pests, and (v) knowledge-grounded language/agent systems (e.g., Retrieval-Augmented Generation) for actionable decision support~\cite{dhamija2020openset_od,joseph2021owod,shizishanGPT2024,agriGPT2025}.
+
+\subsection{Sensor and Remote-Sensing Driven Monitoring}
+A major branch of AI in agriculture builds on field sensing (weather/soil/IoT) and remote sensing (UAV/satellite) to infer crop health indicators (stress, canopy changes, outbreaks) at scale. Drone-based pipelines are often designed around mapping and scouting, combining imagery with geospatial processing and learning models~\cite{rejeb2022drones_review}. While these systems can cover large areas, they frequently provide \emph{symptom signals} rather than fine-grained causal explanations, and may struggle to translate detections into agronomically grounded recommendations.
+
+\subsection{Feature-Engineered Machine Learning Pipelines}
+Before deep learning dominance, crop disease inspection commonly followed a multi-stage pipeline: preprocessing/segmentation $\rightarrow$ handcrafted color/texture/shape features (e.g., GLCM/LBP) $\rightarrow$ classifier (e.g., SVM, RF). For example, Pydipati et al.~\cite{pydipati2006citrus} used color-texture features for citrus disease recognition, and Barbedo~\cite{barbedo2013dip_survey} surveyed classical digital image processing and ML techniques for detecting and classifying plant diseases from visible symptoms. These approaches can work well in controlled setups but typically require careful feature engineering and are sensitive to illumination, background clutter, cultivar differences, and symptom variability.
+
+\subsection{Supervised Deep Learning for Disease Recognition}
+CNN-based learning replaced manual feature design with end-to-end representation learning, achieving strong performance on curated datasets. Mohanty et al.~\cite{mohanty2016plantvillage} demonstrated high-accuracy plant disease classification using a large leaf image dataset, and Ferentinos~\cite{ferentinos2018compag} explored CNN architectures for plant disease detection/diagnosis at scale. However, multiple works highlight that performance can degrade under real field conditions due to dataset bias and limited variety; Barbedo~\cite{barbedo2018datasize} specifically studied how dataset size/variety affects deep learning effectiveness. This motivates research on robustness, generalization, and handling unseen conditions.
+
+\subsection{The ``YOLO Era'': Real-Time Detection and Field Deployment}
+Beyond image-level classification, practical crop monitoring often requires \emph{localization}: detecting pest insects, lesions, or symptomatic regions in complex scenes. One prominent trend is adopting one-stage detectors for real-time performance (e.g., YOLO variants) on UAV/edge devices. Reviews summarize deep learning pipelines for pest detection in field imagery~\cite{li2021insect_review}, and recent works report optimized YOLO variants for small-object pest detection in open fields~\cite{hakim2025yolopest}. While these systems enable real-time scouting, they still typically assume a \emph{closed set} of classes: anything novel is forced into a known label or treated as background.
+
+%\subsection{Open-Set and Open-World Recognition for Unknown Diseases/Pests}
+%Real farms are \emph{open-world} environments: new diseases, new pests, and unseen symptom patterns appear over time. Dhamija et al.~\cite{dhamija2020openset_od} formalized open-set object detection and showed that standard detectors can be overconfident on unknown objects, while Joseph et al.~\cite{joseph2021owod} proposed an open-world detection setting where unknowns are discovered and the detector is incrementally extended. In agriculture-specific contexts, recent studies explicitly extend plant disease recognition toward open-set scenarios to improve real-world applicability~\cite{meng2023known_unknown_compag,dong2025openset_anomaly}. This line of work motivates integrating open-set detection into crop monitoring so that unknown findings can be flagged for expert review rather than misclassified.
+%
+%\subsection{Knowledge-Grounded Reasoning: RAG and Agentic Systems for Decision Support}
+%Detection alone is not sufficient for management; farmers need explanations, confidence, and actionable guidance. Recent work explores LLM-based agricultural assistants that combine retrieval and tools to ground responses in domain knowledge. ShizishanGPT proposes an agricultural QA system built on Retrieval-Augmented Generation and an agent architecture with modules such as search, knowledge graph access, and specialized tool invocation~\cite{shizishanGPT2024}. AgriGPT further develops an agriculture-specialized LLM ecosystem with retrieval-enhanced generation (including multi-channel RAG) and benchmarks for evaluation~\cite{agriGPT2025}. There are also early domain systems that combine vision detection with RAG-style recommendation components for crop disease workflows~\cite{rag_yolo_coffee2025}.
+%These directions suggest that an autonomous crop-health agent should not only detect issues, but also \emph{retrieve} agronomic evidence, generate grounded recommendations, and support human-in-the-loop escalation—particularly when open-set detections indicate unknown or ambiguous cases.
+
+
+\section{Problem Definitions}
+
+%3.2.1 The Data Scarcity Problem: High cost of annotation for rare pests.
+%
+%3.2.2 The Small Object Problem: Difficulty detecting insects in wide-field images.
+%
+%3.2.3 The Semantic Gap: The disconnect between detecting a "spot" and knowing it is "Early Blight."
+\section{Review of Single-Modality Approaches}
+
+%3.3.1 Limitations of Supervised Detectors (YOLOv8, SSD) regarding unseen classes.
+%
+%3.3.2 Limitations of Text-Only LLMs regarding visual context (Hallucination).
+\section{Review of Multi-Modal Approaches}
+%3.4.1 Existing Visual Question Answering (VQA) systems in Agronomy.
+%
+%3.4.2 Recent applications of Foundation Models (DINO/SAM) in agriculture.
+
+\section{Research Gap}
+%Synthesis: Lack of systems that integrate Active Perception (SAHI + DINO) with Structured Reasoning (Agentic RAG) into a unified, autonomous pipeline.

@@ -1,3 +1,30 @@
 \chapter{Methodology}
 \label{chap:method}
 \thispagestyle{open}
+\section{System Overview}
+The "Observe → Verify → Reason → Act" Loop.
+
+High-level architectural diagram.
+
+\section{Module A: Adaptive Perception (The Vision Pipeline)}
+
+%4.2.1 Image Pre-processing: Laplacian Variance for blur detection and brightness gating.
+%
+%4.2.2 Adaptive Inference: Logic for triggering SAHI (Slicing) vs. Standard Inference based on resolution.
+%
+%4.2.3 Prompt Engineering Strategy: Designing robust ontology prompts (e.g., "tomato leaf . caterpillar . beetle").
+%
+%4.2.4 The Verification Layer: Using CLIP to filter False Positives (The "Semantic Filter").
+
+\section{Module B: Knowledge Retrieval (The RAG Pipeline)}
+%4.3.1 Knowledge Base Construction: Sourcing IPM Manuals and PDFs.
+%
+%4.3.2 Chunking and Indexing Strategy in ChromaDB.
+%
+%4.3.3 Query Expansion: Transforming visual tags into semantic search queries.
+
+\section{Module C: Orchestration (The Agent)}
+
+%4.4.1 Pydantic AI Implementation: Defining the State Schema and Type-Safe JSON outputs.
+%
+%4.4.2 Decision Logic: Routing rules (e.g., differentiating "Benign Bug" from "Pest").
