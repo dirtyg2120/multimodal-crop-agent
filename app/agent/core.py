@@ -34,5 +34,6 @@ agronomy_agent = Agent(
         "Use the `consult_ipm_manual` tool to find treatments for the detected disease. "
         "If confidence < 0.5, mark severity as 'Low'. "
         "Return ONLY valid JSON matching the DiagnosisResult schema."
+        # "Translate answer to Vietnamese."
     )
 )

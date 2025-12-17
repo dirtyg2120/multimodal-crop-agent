@@ -7,12 +7,18 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
-clip-vit-large-patch14-plant-disease-finetuned/
+# clip-vit-large-patch14-plant-disease-finetuned/
 .assets
+.venv/
 .env
 
 # My Folder
-data/manuals
-data/chroma_db
-report/report.*
+data/manuals/*
+data/chroma_db/*
+report/*.aux
+app/groundingdino
+# *.pdf
+report/*.ps
+report/*.log
+report/*.dvi
+report/*.tex~
