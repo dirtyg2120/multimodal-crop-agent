@@ -1,11 +1,10 @@
 import asyncio
 import os
 import io
-import torch
 import numpy as np
 import cv2
 import streamlit as st
-from PIL import Image
+import torch
 
 from torchvision.ops import box_convert
 from transformers import CLIPModel, CLIPProcessor
@@ -13,10 +12,11 @@ import groundingdino.datasets.transforms as T
 from groundingdino.util.inference import predict, load_model, annotate, load_image
 
 # --- Your Agent Code ---
-from app.agent.deps import AgronomyDeps
-from app.agent.core import agronomy_agent
-from app.vision.clip_labels import CLIP_LABEL_MAP
-import app.agent.tools
+# from app.agent.deps import AgronomyDeps
+# from app.agent.core import agronomy_agent
+# from app.vision.clip_labels import CLIP_LABEL_MAP
+# import app.agent.tools
+from app.pipe import analyze_full_plant
 
 # --- CONSTANTS & CONFIG ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -90,34 +90,6 @@ def extract_crops(image_source, boxes, phrases):
         })
     return crops
 
-def classify_crop_clip(image_crop, model, processor):
-    """
-    Runs CLIP on a single cropped image to find the disease label.
-    """
-    # Prepare Labels (From your CLIP_LABEL_MAP keys to text list)
-    labels_text = list(CLIP_LABEL_MAP.values())
-    
-    # Convert numpy crop to PIL
-    pil_image = Image.fromarray(image_crop)
-    
-    inputs = processor(
-        text=labels_text,
-        images=pil_image,
-        return_tensors="pt",
-        padding=True
-    ).to(DEVICE)
-
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits_per_image # [1, 42]
-        probs = logits.softmax(dim=1)
-    
-    top_prob, top_idx = probs[0].max(dim=0)
-    top_class_id = top_idx.item()
-    top_confidence = top_prob.item()
-
-    return top_class_id, top_confidence
-
 # --- 3. STREAMLIT UI ---
 
 def main():
@@ -179,38 +151,59 @@ def main():
             st.success(f"Found {len(crops_data)} objects.")
 
             # --- STEP C: CLIP Verification Loop ---
+            with st.spinner("Analyzing plant health & consulting Agent..."):
+                analysis_results = asyncio.run(analyze_full_plant(
+                    crops_data, clip_model, clip_processor, device=DEVICE
+                ))
+            
             st.divider()
-            st.subheader("🔍 Detailed Inspection (CLIP)")
+            st.subheader("📝 Agronomist Diagnosis (Whole Plant)")
             
-            if not crops_data:
-                st.warning("No leaves detected. Try a clearer image.")
-            
-            for i, item in enumerate(crops_data):
-                with st.container():
-                    c1, c2, c3 = st.columns([1, 2, 2])
-                    
-                    # Show Crop
-                    with c1:
-                        st.image(item['crop'], caption=f"Object #{i+1}")
-                    
-                    # Run CLIP
-                    class_id, confidence = classify_crop_clip(item['crop'], clip_model, clip_processor)
-                    label_text = CLIP_LABEL_MAP.get(class_id, "Unknown")
-                    
-                    # Show Result
-                    with c2:
-                        st.markdown(f"**Diagnosis:** `{label_text}`")
-                        st.progress(confidence, text=f"Confidence: {confidence:.2%}")
+            # Extract data from the result dict
+            agent_json = analysis_results["agent_response"]
 
-                    # --- STEP D: Agent (Connect Button) ---
-                    with c3:
-                        if confidence > 0.5: 
-                            if st.button(f"Get Treatment Plan #{i+1}", key=f"btn_{i}"):
-                                with st.spinner("Consulting Agronomy Agent..."):
-                                    # Call the async pipeline (Placeholder)
-                                    st.info("Request sent to Agent Core...")
-                                    # result = asyncio.run(run_rag_pipeline(class_id, confidence))
-                                    # st.json(result)
+            with st.expander("Input"):
+                st.write(analysis_results["stats"].to_dict())
+                st.write(analysis_results["detections"])
+            
+            # Create 3 columns for high-level stats
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Overall Health", agent_json.overall_health_status)
+            k2.metric("Severity Level", agent_json.severity_level)
+            k3.metric("Infection Ratio", f"{agent_json.infection_ratio:.0%}")
+            
+            with st.expander("Treatment Plan", expanded=True):
+                st.write("**Recommended Actions:**")
+                for action in agent_json.recommended_actions:
+                    st.write(f"- {action}")
+                
+                if agent_json.required_pesticides:
+                    st.warning(f"💊 **Chemicals Required:** {', '.join(agent_json.required_pesticides)}")
+
+            # 2. Show Detailed Inspection (The Loop)
+            st.divider()
+            st.subheader("🔍 Individual Leaf Inspection")
+            with st.expander("Details"):
+            
+                detections = analysis_results["detections"]
+                
+                if not detections:
+                    st.warning("No leaves detected.")
+                
+                # Use the data returned from main.py to draw the UI
+                for obj in detections:
+                    # Retrieve the original crop image using the ID
+                    original_crop = crops_data[obj.crop_id]['crop']
+                    
+                    with st.container():
+                        c1, c2, c3 = st.columns([1, 2, 2])
+                        with c1:
+                            st.image(original_crop, width=150)
+                        with c2:
+                            st.markdown(f"**{obj.label}**")
+                            st.progress(obj.confidence, text=f"Confidence: {obj.confidence:.1%}")
+
+            st.divider()
 
 if __name__ == "__main__":
     main()
