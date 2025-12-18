@@ -178,7 +178,7 @@ This mechanism effectively treats the text embeddings as the dynamic weights of 
 
 \section{Large Language Models (LLMs) \& Reasoning}
 \subsection{Generative Transformer Architecture}
-Large Language Models (LLMs) are defined as transformer-based models scaled to billions of parameters. Unlike earlier architectures that process an entire sentence at once (like BERT), modern LLMs primarily use a decoder-only architecture. This design processes text sequentially—reading from left to right—to generate coherent responses token by token.
+Large Language Models (LLMs) are defined as transformer-based models scaled to billions of parameters. Unlike earlier architectures that process an entire sentence at once (like BERT), modern LLMs primarily use a decoder-only architecture. This design processes text sequentially-reading from left to right-to generate coherent responses token by token.
 
 \textbf{Pre-training}
 
@@ -198,7 +198,7 @@ Chain of thought (CoT) \cite{CoT} is a prompt engineering technique that enhance
 
 Reasoning is often considered an ``emergent ability'', meaning it appears naturally as the size and complexity of a model increase. Larger models tend to perform better at this because they have learned more patterns from massive datasets. However, increasing model size is not the only way to improve this. Advances in "instruction tuning" now allow smaller models to perform CoT reasoning effectively by training them on examples of how to respond step-by-step.
 
-%In this report, CoT is applied during the agent's ``Verify'' phase. Rather than allowing the model to guess a crop diagnosis instantly, the system prompts it to list its observations first. By following this logical chain—identifying symptoms first, then comparing them to data—the agent produces more accurate and reliable results.
+%In this report, CoT is applied during the agent's ``Verify'' phase. Rather than allowing the model to guess a crop diagnosis instantly, the system prompts it to list its observations first. By following this logical chain-identifying symptoms first, then comparing them to data-the agent produces more accurate and reliable results.
 \subsection{Retrieval-Augmented Generation (RAG)}
 Retrieval-Augmented Generation \cite{RAG} is an artificial intelligence (AI) application that connects a generative AI model with an external knowledge base. The data in the knowledge base augments user queries with more context so the LLM can generate more accurate responses. RAG enables LLMs to be more accurate in domain-specific contexts without needing fine-tuning.
 
@@ -219,7 +219,32 @@ The relevance of a document is measured using Cosine Similarity. This metric cal
 \section{Agentic AI Frameworks}
 
 \subsection{The ReAct Paradigm}
-A ReAct agent is an AI agent that uses the “reasoning and acting” (ReAct) framework to combine chain of thought (CoT) reasoning with external tool use. The ReAct framework enhances the ability of a large language model (LLM) to handle complex tasks and decision-making in agentic workflows.
-\subsection{Neuro-Symbolic Integration (Structured Outputs)}
+%https://www.k2view.com/blog/react-agent-llm/#What-does-ReACT-stand-for 
+ReAct stands for Reasoning and Acting. It is a paradigm that overcomes the limitations of static Large Language Models (LLMs) by interleaving reasoning traces with executable actions.
 
-\subsection{Control Flow: Workflows vs. Agents}
+In a standard LLM interaction, the model maps an input directly to an output based solely on pre-trained probability weights. In contrast, a ReAct agent operates dynamically by maintaining a continuous feedback loop:
+\begin{itemize}
+	\item \textbf{Thought (Reasoning):} The agent utilizes Chain-of-Thought (CoT) prompting to decompose a complex user request into logical intermediate steps. This internal monologue allows the model to plan before acting.
+	\item \textbf{Action:} Instead of relying on internal parametric knowledge (which may be hallucinated), the agent invokes external tools or functions-such as querying a sensor database or calculating a specific crop metric-to retrieve ground-truth data.
+	\item \textbf{Observation:} The agent perceives the output from the tool and appends this new information to its context window to formulate the next step.
+\end{itemize}
+%Distinction from Conversational Chatbots 
+The fundamental difference between a standard chatbot and a ReAct agent lies in their operational scope. A chatbot is designed to "Talk," utilizing patterns to simulate conversation. A ReAct agent is designed to "Do," perceiving the environment through observations and affecting it through actions. 
+%While a chatbot might estimate a crop's condition based on general training data, a ReAct agent executes a query to the farm’s specific sensors, observes the real-time moisture levels, and provides a recommendation grounded in that specific reality.
+\subsection{Neuro-Symbolic Integration (Structured Outputs)}
+While Large Language Models (LLMs) excel at probabilistic generation, they inherently lack deterministic control. In agricultural and industrial applications, this stochastic nature presents a safety risk; a system cannot ``hallucinate'' a chemical dosage or a sensor ID. To mitigate this, the system employs a Neuro-Symbolic approach.
+
+Neuro-Symbolic AI integrates two distinct paradigms:
+\begin{itemize}
+	\item Neural Component: The LLM, which handles intuition, semantic understanding, and unstructured data %(e.g., "The leaf looks yellowish").
+	\item Symbolic Component: A logic-based validator that enforces strict rules, types, and constraints %(e.g., Dosage must be an integer between 0 and 100).
+\end{itemize}
+In this thesis, this integration is implemented via Schema-Guided Generation (technically realized using Pydantic). By forcing the LLM to collapse its probability distribution into a pre-defined JSON schema, we ensure that the output is not merely text, but a valid executable object. This acts as a guardrail, ensuring that even if the agent’s reasoning is creative, its final actuation commands remain syntactically and semantically valid.
+%\subsection{Control Flow: Workflows vs. Agents}
+%Recent developments in agentic engineering, notably categorized by Ng (2024) and frameworks like LangChain, distinguish between two primary control architectures: Agentic Workflows and Autonomous Agents.
+%
+%Agentic Workflows: These rely on predefined, directed acyclic graphs (DAGs). The path of execution is hard-coded by the engineer (e.g., Step A always leads to Step B). This ensures reliability but limits flexibility; the system cannot handle edge cases outside its design.
+%
+%Autonomous Agents: These utilize a dynamic control loop (such as the ReAct loop). The LLM itself acts as the router, deciding which step to take next based on real-time observations. This maximizes flexibility but introduces unpredictability.
+%
+%Hybrid Approach This thesis proposes a hybrid architecture. The high-level orchestration follows a strict Workflow (Observe → Verify → Reason → Act) to ensure the system consistently adheres to agricultural protocols. However, within each node of this workflow, the system operates as an Autonomous Agent, capable of dynamic tool usage to satisfy the requirements of that specific step. This balances the need for industrial reliability with the adaptability required for biological environments.
