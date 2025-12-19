@@ -7,6 +7,8 @@ from app.agent.deps import AgronomyDeps, DetectedObject
 from app.agent.core import agronomy_agent
 from app.vision.clip_labels import CLIP_LABEL_MAP
 from app import sample
+import app.agent.tools
+
 
 # load_dotenv()
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -41,7 +43,7 @@ async def analyze_full_plant(crops_data: list, clip_model, clip_processor, devic
     
     # CLIP Loop
     for i, item in enumerate(crops_data):
-        class_id, confidence = classify_crop_clip(item['crop'], clip_model, clip_processor)
+        class_id, confidence = classify_crop_clip(item["crop"], clip_model, clip_processor)
         full_label = CLIP_LABEL_MAP.get(class_id, "Unknown")
         
         # Add to detailed list
@@ -63,14 +65,25 @@ async def analyze_full_plant(crops_data: list, clip_model, clip_processor, devic
     # e.g., dino_results = {"leaf": 7, "beetle": 2}
     # pest_tally = {k: v for k, v in dino_results.items() if k != 'leaf'}
 
+    dominant_crop = "General"
+    if detected_objects:
+        # "Tomato leaf with..." -> "Tomato"
+        # "Healthy Tomato leaf" -> "Tomato"
+        first_label = detected_objects[0].label
+        if " leaf " in first_label:
+            dominant_crop = first_label.split(" leaf ")[0]
+        elif "Healthy":
+            dominant_crop = first_label.replace("Healthy ", "").replace(" leaf", "")
+
     # 2. CONTEXT BUILDING (Dependency Injection)
     deps = AgronomyDeps(
-        user_id="stream_user",
+        user_id="user",
+        crop_name=dominant_crop,
         total_leaves=len(detected_objects),
         healthy_count=healthy_count,
-        disease_counts=disease_tally,
+        disease_counts=dict(disease_tally),
         pest_counts=0,
-        detailed_detections=detected_objects
+        detailed_detections=None
     )
 
     # 3. AGENT REASONING (Construct Whole-Plant Prompt)
@@ -91,11 +104,11 @@ async def analyze_full_plant(crops_data: list, clip_model, clip_processor, devic
 
     print(f"   🧠 [Agent] Reasoning ...")
 
-    testing = True
+    testing = False
     if not testing:
         result = await agronomy_agent.run(user_prompt, deps=deps)
         output = result.output
-        print(output.model_dump_json(indent=4))
+        # print(output.model_dump_json(indent=4))
     else:
         output = sample.output
     

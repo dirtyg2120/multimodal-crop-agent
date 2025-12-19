@@ -1,10 +1,12 @@
-import asyncio
 import os
 import io
 import numpy as np
 import cv2
 import streamlit as st
 import torch
+import asyncio
+# import nest_asyncio
+# nest_asyncio.apply()
 
 from torchvision.ops import box_convert
 from transformers import CLIPModel, CLIPProcessor

@@ -16,6 +16,8 @@ dependencies = [
     "llama-index-llms-google-genai>=0.8.0",
     "llama-index-readers-file>=0.5.5",
     "llama-index-vector-stores-chroma>=0.5.3",
+    "llama-parse>=0.6.54",
+    "nest-asyncio>=1.6.0",
     "numpy>=2.2.6",
     "opencv-python>=4.11.0.86",
     "pandas>=2.2.3",
@@ -29,6 +31,6 @@ dependencies = [
     "timm>=1.0.22",
     "torch>=2.9.1",
     "torchvision>=0.24.1",
-    "transformers>=4.57.3",
+    "transformers==4.49.0",
     "yapf>=0.43.0",
 ]

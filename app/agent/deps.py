@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 @dataclass
 class DetectedObject:
@@ -11,11 +11,12 @@ class DetectedObject:
 @dataclass
 class AgronomyDeps:
     user_id: str
+    crop_name: str  # <--- ADD THIS BACK (e.g., "Tomato")
     total_leaves: int
     healthy_count: int
     disease_counts: Dict[str, int]
     pest_counts: Dict[str, int]
-    detailed_detections: List[DetectedObject]
+    detailed_detections: Optional[List[DetectedObject]]
 
     def to_dict(self):
         return asdict(self)
