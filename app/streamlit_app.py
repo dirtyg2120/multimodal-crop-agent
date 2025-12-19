@@ -9,7 +9,6 @@ import asyncio
 # nest_asyncio.apply()
 
 from torchvision.ops import box_convert
-from transformers import CLIPModel, CLIPProcessor
 import groundingdino.datasets.transforms as T
 from groundingdino.util.inference import predict, load_model, annotate, load_image
 
@@ -18,24 +17,23 @@ from groundingdino.util.inference import predict, load_model, annotate, load_ima
 # from app.agent.core import agronomy_agent
 # from app.vision.clip_labels import CLIP_LABEL_MAP
 # import app.agent.tools
-from app.pipe import analyze_full_plant
+from app.pipe import VisionSystem, analyze_full_plant
 
 # --- CONSTANTS & CONFIG ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Grounding DINO Config
-GDINO_CONFIG = "app/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-GDINO_WEIGHTS = "app/groundingdino/weights/groundingdino_swint_ogc.pth"
+# GDINO_CONFIG = "app/groundingdino/config/GroundingDINO_SwinT_OGC.py"
+# GDINO_WEIGHTS = "app/groundingdino/weights/groundingdino_swint_ogc.pth"
+GDINO_CONFIG = "app/groundingdino/config/GroundingDINO_SwinB_cfg.py"
+GDINO_WEIGHTS = "app/groundingdino/weights/groundingdino_swinb_cogcoor.pth"
 TEXT_PROMPT = "leaf . bug . worm ."
 BOX_THRESHOLD = 0.3
 TEXT_THRESHOLD = 0.25
 
-# CLIP Config
-CLIP_MODEL_NAME = "Keetawan/clip-vit-large-patch14-plant-disease-finetuned"
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # --- 1. MODEL LOADING (Cached) ---
-
 @st.cache_resource
 def load_gdino_model():
     """Load Grounding DINO model once."""
@@ -46,15 +44,9 @@ def load_gdino_model():
 @st.cache_resource
 def load_clip_model():
     """Load CLIP model once."""
-    print(f"Loading CLIP on {DEVICE}...")
-    model = CLIPModel.from_pretrained(CLIP_MODEL_NAME)
-    processor = CLIPProcessor.from_pretrained(CLIP_MODEL_NAME)
-    model.to(DEVICE)
-    model.eval()
-    return model, processor
+    return VisionSystem()
 
 # --- 2. VISION HELPER FUNCTIONS ---
-
 def extract_crops(image_source, boxes, phrases):
     """
     Extracts crops from the image based on Grounding DINO boxes.
@@ -101,7 +93,7 @@ def main():
     # Load Models (Cached)
     with st.spinner("Loading AI Models..."):
         dino_model = load_gdino_model()
-        clip_model, clip_processor = load_clip_model()
+        vision_system = load_clip_model()
 
     uploaded_file = st.file_uploader("Upload Crop Image", type=["jpg", "jpeg", "png"])
 
@@ -155,7 +147,7 @@ def main():
             # --- STEP C: CLIP Verification Loop ---
             with st.spinner("Analyzing plant health & consulting Agent..."):
                 analysis_results = asyncio.run(analyze_full_plant(
-                    crops_data, clip_model, clip_processor, device=DEVICE
+                    crops_data, vision_system=vision_system
                 ))
             
             st.divider()
