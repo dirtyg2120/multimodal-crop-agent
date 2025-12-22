@@ -1,0 +1,31 @@
+graph LR
+    %% Input Layer
+    %% Start((Visual Input)) --> Observe[<b>Stage 1: Observe</b><br/>Open-Set Detection]
+    
+    %% Perception to Verification
+    Observe -->|Bounding Box + Label Proposal| Verify[<b>Stage 2: Verify</b><br/>Semantic Alignment Check]
+    
+    %% The Logic Gate
+    Verify --> Confidence{High Confidence?}
+    
+    %% Paths
+    Confidence -- No --> Reroute[Flag for Contextual Reasoning]
+    Confidence -- Yes --> Reason[<b>Stage 3: Reason</b><br/>RAG & Expert Knowledge]
+    
+    Reroute --> Reason
+    
+    %% Knowledge Source
+    KB[(ChromaDB Expert<br/>Knowledge Base)] -.->|Semantic Retrieval| Reason
+    
+    %% Action Layer
+    Reason --> Act[<b>Stage 4: Act</b><br/>Structured Output/Action]
+    %% Act --> End((User Report / Action))
+    
+    %% Feedback Loop
+    Act -.->|Iterative Query| Observe
+    
+    style Observe fill:#e1f5fe,stroke:#01579b
+    style Verify fill:#e1f5fe,stroke:#01579b
+    style Reason fill:#fff3e0,stroke:#e65100
+    style Act fill:#e8f5e9,stroke:#1b5e20
+    style KB fill:#f3e5f5,stroke:#4a148c

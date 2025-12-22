@@ -7,9 +7,9 @@
 % Since the success of AlexNet in 2012\cite{russakovsky2015ilsvrc}
 Since 2012, Convolutional Neural Networks (CNNs) have formed the backbone of most computer vision systems. Successive architectures, including VGG\cite{simonyan2014vgg}, ResNet\cite{he2016resnet}, and EfficientNet\cite{tan2019efficientnet}, consistently achieved strong performance on large-scale benchmarks such as ImageNet\cite{russakovsky2015ilsvrc} and COCO\cite{lin2014coco}. Besides that, CNN-based detectors like YOLO\cite{redmon2016yolo} became widely adopted in real-time applications due to their computational efficiency. CNNs are built to focus on local patterns and recognize them anywhere, which makes them efficient, lightweight, and ideal for running on edge devices.
 
-For tasks requiring global context, this same locality bias is a bottleneck. Capturing long-range dependencies---such as spatial relationships between distant plant organs or complex scene configurations---often requires very deep CNN architectures or additional fine-tuned modules. These designs increase model complexity and may still be insufficient for fine-grained recognition tasks where entire scene understanding is essential.
+For tasks requiring global context, this same locality bias is a bottleneck. Capturing long-range dependencies - such as spatial relationships between distant plant organs or complex scene configurations - often requires very deep CNN architectures or additional fine-tuned modules. These designs increase model complexity and may still be insufficient for fine-grained recognition tasks where entire scene understanding is essential.
 
-The introduction of Vision Transformers (ViTs)\cite{dosovitskiy2021vit} marked a fundamental change in computer vision . ViTs model global interactions from the first layer by using self-attention mechanisms and treating images as sequences of patches. Unlike the hierarchical aggregation used in CNNs, the self-attention mechanism allows every patch to attend to every other patch, which is particularly advantageous for capturing long-range dependencies in complex scenes.
+The introduction of Vision Transformers (ViTs)\cite{dosovitskiy2021vit} marked a fundamental change in computer vision. ViTs model global interactions from the first layer by using self-attention mechanisms and treating images as sequences of patches. Unlike the hierarchical aggregation used in CNNs, the self-attention mechanism allows every patch to attend to every other patch, which is particularly advantageous for capturing long-range dependencies in complex scenes.
 
 There are two primary implications for modern vision systems: \begin{itemize} 
 	\item \textbf{Global Reasoning:} ViTs are better able to handle occlusion and complex spatial distributions due to their natural integration of global structure.
@@ -22,11 +22,13 @@ There are two primary implications for modern vision systems: \begin{itemize}
 
 Conventional object detectors, from two-stage models like Faster R-CNN\cite{fasterrcnn_ren2015} to one-stage architectures like YOLO, typically operate in a closed-set setting. These models learn a mapping from an image to a fixed, finite set of categories $\mathcal{Y}_{\text{known}}$ (e.g., the 80 classes in MS COCO)\cite{lin2014coco}. At test time, the model implicitly assumes that all visible objects belong to this known set. Any object outside this taxonomy - such as a rare pest or a novel disease symptom - is either forced into a known class (misclassification) or treated as background (suppression).
 
-\emph{Open-set object detection} (OSOD) generalizes this formulation. It requires a model to (i) accurately classify instances from $\mathcal{Y}_{\text{known}}$, while (ii) acknowledging inputs from $\mathcal{Y}_{\text{unknown}}$ without overconfident misclassification.\cite{dhamija2020openset} While early OSOD work focused on rejecting unknowns, recent advances in \emph{open-vocabulary} models provide a more flexible solution. By leveraging large-scale vision--language pre-training (e.g., CLIP), these models replace fixed classification layers with text-embedding similarity scores.\cite{radford2021clip,zhu2024surveyovd} This allows a detector not just to reject an unknown object, but to localize it based on descriptive text prompts (e.g.,``necrotic lesion with yellow halo'') that were never seen during training.
+Open-set object detection (OSOD) generalizes this formulation. It requires a model to satisfy two primary objectives: (i) accurately classify instances from $\mathcal{Y}_{\text{known}}$, while (ii) identifying or acknowledging inputs from $\mathcal{Y}_{\text{unknown}}$ without overconfident misclassification \cite{dhamija2020openset}. While early OSOD work focused on rejecting unknowns, recent advances in \emph{open-vocabulary} models provide a more flexible solution. By leveraging large-scale vision--language pre-training (e.g., CLIP), these models replace fixed classification layers with text-embedding similarity scores.\cite{radford2021clip,zhu2024surveyovd} This allows a detector not just to reject an unknown object, but to localize it based on descriptive text prompts (e.g.,``necrotic lesion with yellow halo'') that were never seen during training.
+
+
 
 This distinction is critical because agriculture is inherently an \emph{open-set} environment. The biological landscape is dynamic: new pathogens emerge, invasive species migrate, and symptom appearances shift due to environmental stress.\cite{fuentes2021opensettomato} A closed-set detector is brittle in this context; it cannot recognize a threat it has not been explicitly trained to see. Recent work in plant pathology underlines the necessity of models that can handle these ``unknown'' classes to prevent silent failures in the field.\cite{shen2024opensetpest}
 
-In this thesis, we address this limitation by operationalizing crop health monitoring as a \emph{text-conditioned, open-set} problem. Rather than relying on a static list of pest categories, we propose a pipeline that integrates open-vocabulary detection with agronomic knowledge. The system is designed to localize both known and novel visual patterns by conditioning the detector on textual descriptions, thereby bridging the gap between rigid closed-set training and the dynamic reality of agricultural management.
+In this thesis, we address this limitation by treating crop health monitoring as an open-set problem driven by text. Rather than relying on a static list of pest categories, we propose a pipeline that integrates open-vocabulary detection with agronomic knowledge. The system is designed to localize both known and novel visual patterns by conditioning the detector on textual descriptions, thereby bridging the gap between rigid closed-set training and the dynamic reality of agricultural management.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -67,7 +69,7 @@ To process high-resolution feature maps efficiently, DINO adopts the Deformable 
 DINO mitigates the convergence latency of the original DETR through two complementary strategies:
 \begin{itemize}
 	\item \textbf{Dynamic Anchor Boxes (DAB-DETR):} Static object queries are replaced with dynamic anchor boxes. These anchors explicitly formulate the query position as dynamic spatial priors (coordinates and scale), clarifying the spatial relationship between the query and the target features.
-	\item \textbf{Contrastive Denoising Training (DN-DETR):} To stabilize the bipartite matching process, DINO introduces a denoising training task. The model is fed "noisy" ground-truth bounding boxes and trained to reconstruct the original coordinates. This auxiliary task reduces the ambiguity of bipartite matching during early training phases, significantly accelerating convergence.
+	\item \textbf{Contrastive Denoising Training (DN-DETR):} To stabilize the bipartite matching process, DINO introduces a denoising training task. The model is fed ``noisy'' ground-truth bounding boxes and trained to reconstruct the original coordinates. This auxiliary task reduces the ambiguity of bipartite matching during early training phases, significantly accelerating convergence.
 \end{itemize}
 \subsection{GLIP and Grounded Pre-Training}
 Grounding DINO extends the capabilities of standard detection by incorporating language supervision, enabling ``zero-shot'' detection where the model can identify objects based on arbitrary text descriptions without re-training. This relies on the methodology introduced by GLIP, which reformulates object detection as a \textbf{phrase grounding} task, replacing fixed class IDs with alignable word embeddings.
@@ -79,7 +81,7 @@ The model's generalization capability stems from a diverse combination of datase
 	\item \textbf{Grounded Data (e.g., RefCOCO):} Crucially, this data links specific phrases in a sentence to specific image regions. This bridges the gap between visual features and linguistic semantics, allowing the model to learn the association between textual concepts and visual patterns directly.
 \end{itemize}
 \subsection{Grounding DINO Architecture}
-The Grounding DINO architecture is designed to process image-text pairs simultaneously to achieve open-set detection. As illustrated in Figure \ref{fig:grounding_dino}, the model comprises several key components: a dual-backbone feature extractor, a feature enhancer for multi-modal fusion, a language-guided query selection module, and a cross-modality decoder.
+The Grounding DINO architecture is designed to process image-text pairs simultaneously to achieve open-set detection. As illustrated in Figure \ref{fig:grounding_dino_arch}, the model comprises several key components: a dual-backbone feature extractor, a feature enhancer for multi-modal fusion, a language-guided query selection module, and a cross-modality decoder.
 
 \begin{figure}[h]
 	\centering
@@ -91,7 +93,7 @@ The Grounding DINO architecture is designed to process image-text pairs simultan
 \textbf{Feature Extraction and Encoding} \\
 The model processes the input image and text prompt through separate backbones:
 \begin{itemize}
-	\item \textbf{Image Backbone:} A Swin Transformer \cite{liu2021swin} is employed to extract hierarchical visual features from different layers, capturing multi-scale visual information.
+	\item \textbf{Image Backbone:} A Swin Transformer\cite{liu2021swin} is employed to extract hierarchical visual features from different layers, capturing multi-scale visual information.
 	\item \textbf{Text Backbone:} The text prompt is tokenized using Byte-Pair Encoding (BPE) and encoded by a BERT model \cite{devlin2018bert}. This produces a sequence of text embeddings with dimension $N \times 768$, where $N$ is the number of tokens.
 \end{itemize}
 
@@ -126,16 +128,16 @@ The selected queries are fed into a cross-modality decoder. Here, query features
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{CLIP}
-CLIP is a neural network adept at grasping visual concepts through natural language supervision. It operates by concurrently training a text encoder and an image encoder, focusing on a pre-training task that involves matching captions with corresponding images. This architecture allows CLIP to adapt to a variety of visual classification benchmarks seamlessly. It does so by simply receiving the names of the visual categories to be recognized.
+CLIP\cite{radford2021learning} is a neural network adept at grasping visual concepts through natural language supervision. It operates by concurrently training a text encoder and an image encoder, focusing on a pre-training task that involves matching captions with corresponding images. This architecture allows CLIP\cite{radford2021learning} to adapt to a variety of visual classification benchmarks seamlessly. It does so by simply receiving the names of the visual categories to be recognized.
 \subsection{Learning from Unstructured Data}
 Traditional computer vision models have depended on supervised learning methods that need high-quality, human-annotated datasets. In standard benchmarks, models are trained to predict a fixed set of predetermined categories, which are manually verified for accuracy. While effective for closed-set tasks, this approach has two limitations: the high cost of scaling manual annotation to new domains and the inability of the model to generalize beyond its training taxonomy.
 
-CLIP resolves these limitations by changing from crowd-sourced labeling to natural language supervision. Instead of relying on a restricted ontology of categorical labels , CLIP learns from a massive dataset of 400 million image-text pairs collected from the public internet (WebImageText). 
+CLIP\cite{radford2021learning} resolves these limitations by changing from crowd-sourced labeling to natural language supervision. Instead of relying on a restricted ontology of categorical labels , CLIP learns from a massive dataset of 400 million image-text pairs collected from the public internet (WebImageText). 
 
 This method makes use of the semantic richness of unstructured text found on the web. By treating natural language descriptions as labels, the model is not confined to a static list of IDs but instead learns to associate visual features with a vast array of linguistic concepts. This transition enables the model to generalize unseen categories without task-specific retraining.
 
 \subsection{Contrastive Learning}
-At the core of CLIP is a contrastive learning objective designed to align visual and textual representations into a shared embedding space. Unlike traditional classification tasks that map images to discrete labels, CLIP solves a proxy task of predicting which text description matches which image within a given batch.
+At the core of CLIP\cite{radford2021learning} is a contrastive learning objective designed to align visual and textual representations into a shared embedding space. Unlike traditional classification tasks that map images to discrete labels, CLIP solves a proxy task of predicting which text description matches which image within a given batch.
 
 For a batch of $N$ (image, text) pairs, the model constructs an $N \times N$ similarity matrix by computing the cosine similarity between all image and text embeddings. The training objective is to maximize the similarity scores of the $N$ correct pairings (the diagonal of the matrix) while minimizing the scores of the $N^2 - N$ incorrect pairings (the off-diagonal elements). This forces the model to learn a multi-modal embedding space where semantically similar images and texts are located close to each other.
 

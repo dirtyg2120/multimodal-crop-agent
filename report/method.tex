@@ -1,30 +1,152 @@
 \chapter{Methodology}
 \label{chap:method}
 \thispagestyle{open}
-\section{System Overview}
-The "Observe → Verify → Reason → Act" Loop.
+\section{Conceptual Agent Architecture}
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{images/agent_arch.png}
+	\caption{Conceptual Agent Architecture}
+	\label{fig:agent_arch}
+\end{figure}
 
-High-level architectural diagram.
+The diagram \ref{fig:agent_arch} illustrates the logical flow and the decoupling of the vision, knowledge, and orchestration layers. The agent operates in a four-stage cycle that separates finding an object from identifying its condition:
+\begin{enumerate}
+	\item \textbf{Observe (Localization):} The agent uses Grounding DINO\cite{liu2023grounding} to scan the image for general agricultural objects. It uses simple prompts like ``leaf'', ``bug'', or ``worm''. The goal here is just to find the location and create a bounding box around the object.
+	\item \textbf{Verify (Fine-Grained Classification):} Once a box is found, the agent crops that image and sends it to the fine-tuned CLIP model. This model checks for specific diseases or pests, such as ``Durian leaf with Algal Leaf Spot'' or ``Grasshopper''. This acts as a verification layer to ensure the diagnosis is precise.
+	\item \textbf{Reason (Knowledge Retrieval):} After the disease or pest is identified, the agent queries the RAG system. It retrieves expert advice from the database about that specific condition.
+	\item \textbf{Act (Response Generation):} The agent combines the visual findings and the retrieved expert knowledge to create a final report. 
+\end{enumerate}
 
-\section{Module A: Adaptive Perception (The Vision Pipeline)}
+\textbf{State Management} 
 
-%4.2.1 Image Pre-processing: Laplacian Variance for blur detection and brightness gating.
-%
-%4.2.2 Adaptive Inference: Logic for triggering SAHI (Slicing) vs. Standard Inference based on resolution.
-%
-%4.2.3 Prompt Engineering Strategy: Designing robust ontology prompts (e.g., "tomato leaf . caterpillar . beetle").
-%
-%4.2.4 The Verification Layer: Using CLIP to filter False Positives (The "Semantic Filter").
+To make the agent understand the whole context, it needs to remember its progress. during a diagnostic session. I implemented a state management process that included these functions:
+\begin{itemize}
+	\item Tracking Objects: The agent keeps track of every leaf or bug it has already checked. This prevents it from wasting time analyzing the same spot twice.
+	\item Handling Unclear Results: If the CLIP model is not sure about a disease (low similarity score), the agent’s memory records this uncertainty. It then uses the Reasoning stage to look for ``look-alike'' symptoms in the knowledge base instead of just guessing.
+	\item System Flexibility: Because the architecture is modular, I use a general detector (Grounding DINO) to find anything and a specialized classifier (Fine-tuned CLIP) to identify specifics. This makes it easy to add new plants or pests to the system later just by updating the CLIP prompts or the RAG database.
+\end{itemize}
 
-\section{Module B: Knowledge Retrieval (The RAG Pipeline)}
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Perception \& Verification}
+The perception layer is responsible for turning raw images into useful data. This process is split into two simple parts: first, finding where the objects are (Localization), and second, identifying exactly what they are (Verification).
+
+\subsection{Open-Set Detection Strategy (Grounding DINO)}
+The first part of the vision system uses Grounding DINO\cite{liu2023grounding} to find objects in the image. This is an open-set detector, meaning it can find things based on simple text descriptions without needing to be retrained for every new plant or insect.
+
+\begin{itemize}
+	\item \textbf{Model Backbone:} This implementation employs the Swin-B (Base) backbone. Compared to the smaller Swin-T variant, the Swin-B architecture provides a richer feature representation, which helps the agent better identify agricultural objects in complex, high-entropy backgrounds.
+	\item \textbf{Prompting Strategy:} The agent is configured with a general prompt: \textit{``leaf . bug . worm''}. This strategy enables the model to scan the entire plant structure simultaneously, identifying both the leaves and pests.	
+	\item \textbf{Detection Hyperparameters:} To maximize recall while maintaining precision, the following thresholds are applied:
+	\begin{itemize}
+		\item \textbf{Box Threshold ($\tau_{box} = 0.3$):} Filters bounding boxes to ensure the agent only processes if it is at least 30\% sure an object is there.
+		\item \textbf{Text Threshold ($\tau_{text} = 0.25$):} Ensures the detected visual features align with the semantic tokens in the input prompt.
+	\end{itemize}
+	\item \textbf{Cropping:} Grounding DINO generates coordinates for each detection. These regions will be cropped and normalized to be passed into the subsequent verification layer.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Semantic Verification Layer (CLIP)}
+After the objects are found, the agent must check their health or identify the species. This stage uses two different versions of the CLIP model to ensure the results are accurate.
+
+\begin{itemize}
+	\item \textbf{Checking Leaves (Disease Identification):} If the object is a leaf, it is sent to a fine-tuned CLIP model (\texttt{keetawan/clip-vit-large-patch14-plant-disease} \cite{keetawan2024plantdisease}). This model has been specifically trained to recognize plant diseases, such as \textit{``Durian leaf with Algal Leaf Spot''} or \textit{``Healthy Tomato leaf''}.
+	\item \textbf{Checking Pests (Bug Identification):} If the object is a bug or a worm, it is sent to the standard CLIP model (\texttt{openai/clip-vit-base-patch16}). This version is better at general identification and helps identify insects like a \textit{``Ladybug''} or \textit{``Grasshopper''} without getting confused by leaf features.
+\end{itemize}
+
+
+
+\subsection{Comparative Analysis of Perception Stages}
+The following table summarizes the functional separation between the localization and verification stages within the agentic loop.
+
+\begin{table}[h]
+	\centering
+	\caption{Comparison of Detection vs. Verification Stages}
+	{\renewcommand{\arraystretch}{1.5}
+	\begin{tabular}{lp{6cm}p{5cm}}
+		\toprule
+		\textbf{Feature} & \textbf{Grounding DINO (Observe)} & \textbf{CLIP (Verify)} \\ 
+		\hline
+		\textbf{Goal} & Spatial Localization (Bounding Boxes) & Semantic Classification (Health/Species) \\ 
+%		\hline
+		\textbf{Input} & General Categories (e.g., \textit{leaf, bug}) & Specific Labels (e.g., \textit{Late Blight, Black rot}) \\ 
+%		\hline
+		\textbf{Architecture} & Open-set Detector (Swin-B) & Multimodal Classifier (Finetuned/Base) \\ 
+%		\hline
+		\textbf{Output} & Region Coordinates & Confidence Scores per Class \\ 
+		\bottomrule
+	\end{tabular}
+	}
+	\label{tab:detection_vs_verification}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Knowledge Retrieval (RAG)}
+After a specific disease or pest is identified, the agent must provide actionable advice. This is achieved through a Retrieval-Augmented Generation (RAG) system, which allows the agent to look up expert facts from a reliable external source.
+
+\subsection{Knowledge Base Construction}
+The RAG system relies on a curated library of agricultural information. This ensures that the agent's recommendations are grounded in expert knowledge rather than just statistical guesses.
+
+\begin{itemize}
+	\item \textbf{Data Collection:} The knowledge base includes data on symptoms, causes, and treatments for various crops, with a specific focus on the Tomato varieties found in the PlantVillage dataset.
+	\item \textbf{Chunking and Embedding:} Large expert documents are divided into smaller, manageable text segments. These segments are converted into numerical vectors using an embedding model, which represents the semantic meaning of the agricultural advice.
+\end{itemize}
+
+\subsection{Semantic Search and Indexing (ChromaDB)}
+To retrieve the correct information during the diagnostic loop, the agent uses \textbf{ChromaDB} as its vector database.
+
+\begin{itemize}
+	\item \textbf{Vector Storage:} All embedded knowledge chunks are indexed within ChromaDB. This allows for high-speed searching during the "Reason" stage of the agentic loop.
+	\item \textbf{Similarity Search:} When the CLIP model identifies a condition (e.g., \textit{``Tomato Late Blight''}), the agent generates a query vector. ChromaDB then performs a similarity search to find the most relevant treatment protocols.
+	\item \textbf{Contextual Filtering:} The search is restricted based on the current context (such as the plant species). This ensures that the retrieved information is specific to the user's current problem and ignores irrelevant data.
+\end{itemize}
+
 %4.3.1 Knowledge Base Construction: Sourcing IPM Manuals and PDFs.
 %
 %4.3.2 Chunking and Indexing Strategy in ChromaDB.
 %
 %4.3.3 Query Expansion: Transforming visual tags into semantic search queries.
 
-\section{Module C: Orchestration (The Agent)}
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Orchestration and Logic}
+The orchestration layer serves as the central control unit of the agent. It manages the flow of information between the vision models and the knowledge base, ensuring the agent follows a logical decision-making path.
+
+By using Pydantic schemas, the architecture ensures that all data passed between tools (such as bounding box coordinates or classification labels) is strictly formatted. This prevents errors that often occur when passing unstructured text between different AI models.
+
+\textbf{Decision Routing Logic}
+
+The agent uses a routing mechanism to control the execution of tasks. This allows the system to be autonomous and adaptive.
+
+\begin{itemize}
+	\item Conditional Routing: The system can change its behavior based on findings. For example, if no pests or diseases are found during the verification stage, the agent is programmed to terminate the loop early and report a ``Healthy'' status, saving computational resources.
+	\item Result Synthesis: The orchestration layer combines the visual evidence from CLIP with the textual advices from ChromaDB to generate a single, structured report for the end-user.
+\end{itemize}
 
 %4.4.1 Pydantic AI Implementation: Defining the State Schema and Type-Safe JSON outputs.
 %
 %4.4.2 Decision Logic: Routing rules (e.g., differentiating "Benign Bug" from "Pest").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\section{Data Strategy}
+%This section describes the data used to develop and validate the proposed agentic framework.
+%
+%\subsection{Primary Dataset: PlantVillage}
+%The core of the evaluation uses the \textbf{PlantVillage} dataset. This dataset is a widely recognized benchmark in digital agriculture, containing thousands of images of healthy and diseased plant leaves.
+%
+%\begin{itemize}
+%	\item \textbf{Crop Scope:} For the purposes of this thesis, the focus is placed on \textbf{Tomato} crops. This choice is due to the high variety of diseases available in the dataset, which provides a challenging environment for the verification layer.
+%	\item \textbf{Usage in the Loop:} These images are used to test the transition between the \textit{Observe} stage (detecting the leaf) and the \textit{Verify} stage (identifying the specific pathology using the fine-tuned CLIP model).
+%\end{itemize}
+%
+%\subsection{Open-Set and Pest Validation}
+%To test the agent's ability to detect more than just leaves, additional data is used.
+%\begin{itemize}
+%	\item \textbf{General Pests:} Images of common agricultural pests, such as beetles and worms, are used to validate the \textbf{base CLIP} model's ability to identify insects without being biased toward leaf features.
+%	\item \textbf{Open-Set Robustness:} The agent is tested with images containing non-agricultural objects to ensure Grounding DINO correctly filters out irrelevant data.
+%\end{itemize}
+%
+%\subsection{Evaluation Metrics}
+%The success of the data strategy is measured by the agent's ability to correctly link a visual symptom to a specific treatment recommendation. Metrics include detection precision for Grounding DINO and classification accuracy for the dual-CLIP verification process.

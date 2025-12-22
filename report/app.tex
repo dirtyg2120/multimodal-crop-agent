@@ -1,27 +1,100 @@
 \chapter{Prototype Development}
 \label{chap:app}
 \thispagestyle{open}
-\section{User Requirements}
+%\section{User Requirements}
+%
+%\section{System Architecture}
 
-\section{System Architecture}
+\section{Prototype}
+The framework is made publicly available on \href{https://github.com/dirtyg2120/multimodal-crop-agent}{https://github.com/dirtyg2120/multimodal-crop-agent}.
+
+The website’s homepage is very simple, just a place for user to upload an image.
+\begin{figure}[H]
+	\centering
+	\frame{\includegraphics[width=\textwidth]{images/1-main.png}}
+	\caption{Main page}
+	\label{fig:main}
+\end{figure}
+
+The main page after user upload an image. There are 3 custom fields: ``caption, tex\_threshold and box\_threshold'' to custom the parameters for running Grouding DINO.
+
+\begin{figure}[H]
+	\centering
+	\frame{\includegraphics[width=\textwidth]{images/2-upload.png}}
+	\caption{Main page after uploading image}
+	\label{fig:upload}
+\end{figure}
+
+After user click ``Analyze Image'', the model will be applied and return labels with bounding box as shown. 
+
+\begin{figure}[H]
+\centering
+\frame{\includegraphics[width=\textwidth]{images/3-gdino.png}}
+\caption{Visualize the output result from running Grouding DINO}
+\label{fig:gdino}
+\end{figure}
+
+After Grounding DINO detect all the objects, the system will crop all the bounding boxes and send to CLIP verifier.
+
+\begin{figure}[H]
+\centering
+\frame{\includegraphics[width=\textwidth]{images/4-result.png}}
+\caption{Result show after all steps (Run in the background)}
+\label{fig:result}
+\end{figure}
+
+If user click on the ``Details'' expander of ``Invidual Leaf Inspection'' part. It will display all cropped images and their labels
+
+\begin{figure}[H]
+	\centering
+	\frame{\includegraphics[width=\textwidth]{images/6-details.png}}
+	\caption{Additional pages to see the label of each object}
+	\label{fig:details}
+\end{figure}
+
+If user click on the ``Input'' expander of ``Agronomist Diagnosis'' part. It will display the input which will be send to AI Agent, and the part of retrieving RAG is run in the background.
+
+\begin{figure}[H]
+\centering
+\frame{\includegraphics[width=\textwidth]{images/5-input.png}}
+\caption{Additional pages to see the input for AI Agent}
+\label{fig:input}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Technologies}
-%Technologies and Libraries
+\subsection{PyTorch}
+PyTorch is a popular open-source machine learning library primarily used for computer vision and natural language processing. In this project, PyTorch acts as the engine that runs our vision-related models. I use it to load and execute pre-trained models from the Hugging Face library, such as Grounding DINO for detecting objects and CLIP for verifying them.
+
+The main reason for choosing PyTorch is its flexibility and its ability to perform high-speed calculations on a GPU. This is essential for our agent because processing high-resolution images of crops requires significant computing power. By using PyTorch, the agent can analyze images quickly. It also provides a wide range of tools for handling image data, making it easier to integrate the vision system with the rest of the software stack.
+
+\subsection{Pydantic AI}
+Pydantic AI is a specialized framework designed to manage how AI agents behave and make decisions. It serves as the ``brain''that controls the flow of our ``Observe-Verify-Reason-Act''loop. While many other tools focus only on sending prompts to a model, Pydantic AI ensures that every piece of information moving through the system follows a strict format.
+
+I use this framework to define exactly what the input and output should look like for each step. For example, when the vision module identifies a disease, Pydantic AI checks that the data is sent in the correct structure (such as a specific list of names and confidence scores) before passing it to the reasoning module. This strict data validation prevents the agent from making errors caused by messy or unexpected information. It makes the system more reliable because the AI is forced to follow a predictable path, reducing the chance of ``hallucinations or logical mistakes.
+
+\subsection{LlamaIndex}
+LlamaIndex is a data framework used to connect our Large Language Model (LLM) with external data sources. This process is known as Retrieval-Augmented Generation (RAG). In this project, the agent needs more than just general knowledge; it needs specific, expert-level information about tomato diseases, pests, and treatment protocols.
+
+LlamaIndex allows us to take large documents, such as agricultural textbooks and diagnostic guides, and turn them into a format the agent can easily search. When the agent identifies a specific problem on a plant, LlamaIndex finds the most relevant sections of text from our knowledge base and provides them to the LLM. This ensures that the advice the agent gives to a farmer is grounded in real agricultural science rather than just a guess. It handles the difficult task of indexing and retrieving text so that the agent always has the right context at the right time.
+
+\subsection{ChromaDB}
+ChromaDB is a vector database that works alongside LlamaIndex to store and retrieve information based on its meaning. Traditional databases search for exact words, but ChromaDB stores data as embeddings, which are mathematical representations of the meaning of the text. This allows the agent to perform a ``semantic search''.
+
+For instance, if the agent detects ``early blight'' but the documentation uses slightly different terms, ChromaDB can still find the correct information because it understands that the topics are related. I chose ChromaDB because it is lightweight, fast, and easy to set up within a Python environment. It stores all our embedded agricultural data in an organized way, allowing the agent to find the correct treatment protocols in milliseconds. This speed is vital for maintaining a responsive system when the agent has to look through thousands of pages of expert documentation.
+
+\subsection{Streamlit}
+Streamlit is an open-source framework used to create the web-based user interface for our application. It allows us to build a professional-looking dashboard using only Python, without needing to write complex HTML, CSS, or JavaScript code.
+
+Through the Streamlit interface, a user can upload a photo of a crop and see the agent's work in progress. The dashboard displays the original image, marks the areas where problems were detected, and shows the final diagnostic report. I chose Streamlit because it is perfect for data-heavy applications. It allows us to visualize the agent's reasoning process in a way that is easy for a human to understand. This transparency is important for building trust with users, as they can see exactly why the agent is making a specific recommendation.
+
+%\subsection{Orchestration \& Backend}
 %
-\subsection{Core AI Models}
-%
-%Grounding DINO & SAHI: Used for zero-shot detection and small object slicing.
-%
-%CLIP (OpenAI): Employed for the semantic verification layer.
-%
-%GPT-4o: Selected as the reasoning engine due to its superior instruction-following capabilities compared to smaller open-source models.
-%
-\subsection{Orchestration \& Backend}
-%
-%Pydantic AI: Chosen to enforce type safety and structured JSON outputs, preventing the "stochastic" nature of LLMs from breaking the pipeline.
+%Pydantic AI: Chosen to enforce type safety and structured JSON outputs, preventing the ``stochastic''nature of LLMs from breaking the pipeline.
 %
 %ChromaDB: Used as the local vector store for low-latency retrieval of agronomic manuals.
 %
-\subsection{User Interface}
+%\section{User Interface}
 %
 %Streamlit: Selected for rapid prototyping of the interactive dashboard.

@@ -1,19 +1,29 @@
-\chapter{Experiments and Results}
-\label{chap:result}
-\thispagestyle{open}
-\section{Experimental Setup}
-%Hardware specs (GPU/TPU usage).
-%Evaluation Metrics (mAP, IoU for Vision; Precision/Recall for Retrieval).
-\section{Perception Benchmarking (Vision)}
-%7.2.1 Grounding DINO vs. YOLOv8 (Zero-shot vs. Supervised trade-off).
-%
-%7.2.2 Efficacy of SAHI on small objects.
-\section{Cognition Benchmarking (Logic)}
-%7.3.1 RAG Retrieval Accuracy (Did it find the right manual?).
-%
-%7.3.2 Agent Decision Quality (Did it recommend the right chemical?).
+\chapter{Evaluation Plan and Expected Contributions}
+\section{Proposed Evaluation Metrics}
+The system will be evaluated using three primary metrics to ensure each part of the loop is performing correctly:
+\begin{itemize}
+	\item \textbf{Mean Average Precision:} Used to assess the localization accuracy of Grounding DINO in identifying leaves, bugs, and worms.
+	\item \textbf{Accuracy:} Used to measure the performance of the dual-CLIP verification layer in identifying specific pathologies.
+	\item \textbf{Retrieval Relevance:} Evaluates the RAG system's ability to provide the correct expert treatment advice from ChromaDB based on the identified condition.
+	\item \textbf{Visual Case Analysis:} This analysis focuses on the agent's robustness in many other images from the Internet with complex context, ensuring the reasoning and recommendation still perform well.
+\end{itemize}
 
+%\chapter{Expected Contributions \& Conclusion}
+\section{Expected Contributions}
+This thesis aims to contribute to the field of Agentic AI in agriculture by:
+\begin{itemize}
+	\item Providing a solid ``Observe-Verify-Reason-Act'' framework that bridges the gap between raw vision and expert reasoning.
+	\item Demonstrating the use of Open-Set Detection to handle the diverse and changing nature of farm environments without constant retraining.
+	\item Developing a method for knowledge grounding that ensures AI recommendations are based on verified agricultural facts.
+\end{itemize}
 
-\section{Discussion}
+The primary contribution of this research is the development of a stateful agentic loop that integrates open-set detection with expert knowledge. By moving away from static pipelines, this work demonstrates a more flexible and reliable approach to precision agriculture.
 
-%Analysis of Latency vs. Accuracy trade-offs.
+\section{Future Work}
+Future developments for this project include:
+\begin{itemize}
+	\item Image Quality Check: Adding a layer to detect motion blur, poor lighting, or extreme occlusion. If the quality is too low, the agent will request a new image rather than risk a wrong diagnosis.
+	\item SAHI Integration: Combining Slicing Aided Hyper Inference (SAHI) with these quality checks to help Grounding DINO handle high-resolution images, ensuring small pests are not missed due to image downscaling.
+	\item Stateful Memory: The system will save every detection result (with timestamps) into a long-term database. The agent will be able to query this history to identify patterns.
+	\item Specialist Model Fallback: Implementing a multi-tier verification system for high-uncertainty cases.
+\end{itemize}

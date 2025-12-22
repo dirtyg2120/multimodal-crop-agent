@@ -1,3 +1,35 @@
 \chapter{Introduction}
 \label{chap:intro}
 \thispagestyle{open}
+
+\section{Motivation}
+Agriculture is important for the world's food supply, but it is under threat from new diseases and changes in the weather. Checking crops for health problems requires regular monitoring and expert knowledge. However, doing this manually is very difficult on large farms or in remote areas.
+
+Artificial Intelligence has already been applied to this problem, but current systems primarily rely on a fixed set of predefined disease labels. These models often fail to generalize when encountering novel pests or complex ``whole-plant'' image in unstructured field conditions. Furthermore, there is a persistent "Semantic Gap" between simple visual detection and providing actionable, scientifically grounded advice. There is a need for a system that can see what is happening, verify the findings, and provide expert reasoning automatically to help farmers.
+
+\section{Goals}
+The main goal of this thesis is to build an autonomous system for crop health that combines vision and reasoning. Our specific goals are: 
+\begin{itemize} 
+	\item Implement an Observe$\rightarrow$Verify$\rightarrow$Reason$\rightarrow$Act loop to move from simple classification to a complete diagnostic workflow. 
+	\item Develop an open-set perception module to identify pests and diseases based on natural language descriptions instead of fixed class IDs.
+	\item Integrate a fine-tuned CLIP verifier to reduce false positives by matching images with scientific descriptions. 
+	\item Build an Agentic RAG (Retrieval-Augmented Generation) engine that that links detections to a database of agricultural books and papers, eliminating the risk of Large Language Model (LLM) hallucinations. 
+\end{itemize}
+
+\section{Scopes}
+This study focuses on the development of a vision-based diagnostic agent with the following boundaries: \begin{itemize} 
+	\item The system is designed to process ``whole-plant'' image captured in field environments, rather than a single object. 
+	\item The system is built for general-purpose application, but I focus on Vietnamese crops like durian and tomato. 
+	\item The final output of the system is a diagnostic report and treatment recommendation.
+\end{itemize}
+
+\section{Thesis Structure}
+This thesis is organized into six chapters, following the logical progression from theoretical foundations to experimental validation: 
+\begin{itemize} 
+	\item \textbf{Chapter 1: Introduction} presents the motivation, objectives, and scope of the research. 
+	\item \textbf{Chapter 2: Theoretical Background} details the underlying mechanisms of Grounding DINO, CLIP, and Agentic RAG systems. 
+	\item \textbf{Chapter 3: Related Works} reviews the evolution of AI in agriculture and identifies the research gaps in current multimodal integration. 
+	\item \textbf{Chapter 4: Methodology} describes the proposed ``Observe--Verify--Reason--Act'' architecture and its specific implementation details. 
+	\item \textbf{Chapter 5: Prototype Development} show the demo application, which display step by step how the works done.
+	\item \textbf{Chapter 6: Evaluation Plan and Expected Contribution} outlines the metrics for system validation, highlights technical contributions, and proposes future research directions. 
+\end{itemize}

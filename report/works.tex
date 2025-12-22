@@ -13,15 +13,33 @@ While pioneers like Pydipati et al. \cite{pydipati2006identification} demonstrat
 \subsection{Supervised Deep Learning Dominance}
 The introduction of Convolutional Neural Networks (CNNs) marked a pivotal shift, allowing systems to automatically learn features from raw data. Early works by Mohanty et al. \cite{mohanty2016using} and Ferentinos \cite{ferentinos2018deep} utilized architectures like AlexNet and GoogLeNet on the PlantVillage dataset, achieving human-level accuracy in disease classification.
 
-This era evolved rapidly from simple classification (labelling an entire image) to real-time object detection, often referred to as the "YOLO Era." Single-stage detectors such as YOLO (You Only Look Once) became the industry standard for field scouting, enabling the localization of specific pests or lesions in milliseconds \cite{li2021comprehensive}. However, these systems operate on a "closed-set" assumption: they can only detect the specific classes they were trained on. If a supervised model encounters a novel pest or an undocumented disease variant, it will either miss it entirely or confidently misclassify it, highlighting a critical limitation in open-field adaptability.
+This era evolved rapidly from simple classification (labelling an entire image) to real-time object detection, often referred to as the ``YOLO Era''. Single-stage detectors such as YOLO (You Only Look Once) became the industry standard for field scouting, enabling the localization of specific pests or lesions in milliseconds \cite{li2021comprehensive}. However, these systems operate on a ``closed-set'' assumption: they can only detect the specific classes they were trained on. If a supervised model encounters a novel pest or an undocumented disease variant, it will either miss it entirely or confidently misclassify it, highlighting a critical limitation in open-field adaptability.
 
 \subsection{The Emergence of Foundation Models and Agentic AI}
-The current frontier addresses the limitations of closed-set supervision through \textbf{Foundation Models}. Unlike their predecessors, models like CLIP \cite{radford2021learning} and Grounding DINO \cite{liu2023grounding} are trained on massive, internet-scale datasets of image-text pairs. This enables "Zero-Shot" detection, where a system can identify a pest it has never seen before, simply by understanding its textual description.
+The current frontier addresses the limitations of closed-set supervision through \textbf{Foundation Models}. Unlike their predecessors, models like CLIP \cite{radford2021learning} and Grounding DINO \cite{liu2023grounding} are trained on massive, internet-scale datasets of image-text pairs. This enables ``Zero-Shot'' detection, where a system can identify a pest it has never seen before, simply by understanding its textual description.
 
 Furthermore, the integration of Large Language Models (LLMs) has given rise to \textbf{Agentic AI}. Rather than acting as passive detectors, these systems function as autonomous agents capable of "Active Perception"-observing a symptom, verifying it, and retrieving external knowledge (RAG) to form a diagnosis. This shift moves the goalpost from simple detection accuracy to holistic, actionable decision support.
 
 
 \section{Problem Definitions}
+
+To properly contextualize the challenges in autonomous crop health management, we formally define the technical limitations inherent in traditional supervised learning and generation tasks. These definitions establish the necessity for the open-set and retrieval-augmented architecture proposed in this thesis.
+
+\subsection{The Open-Set Recognition Problem}
+Standard object detection systems operate under a ``Closed-Set'' assumption. In this paradigm, a model is trained on a dataset $D_{train} = \{(x_i, y_i)\}_{i=1}^N$, where $x_i$ is an input image and $y_i$ belongs to a fixed set of predefined classes $C_{train} = \{c_1, c_2, \dots, c_k\}$. The detection function $f$ is optimized to map an input to one of these known classes:
+\[ f(x) \rightarrow \hat{y} \in C_{train} \]
+
+The fundamental problem arises during deployment when the system encounters a novel pest or disease instance $x_{new}$ belonging to a class $c_{new}$ such that $c_{new} \notin C_{train}$. A closed-set detector is forced to map $x_{new}$ to the closest existing class in $C_{train}$, resulting in a confident error or false positive.
+
+\textbf{Open-Set Recognition}, therefore, requires a model capable of zero-shot transfer. This is defined as learning a function $f(x, t) \rightarrow \hat{y}$, where $t$ is a natural language description, allowing the identification of classes where $C_{test} \not\subseteq C_{train}$.
+
+\subsection{The Semantic Gap and Hallucination}
+While visual detectors identify spatial features (e.g., bounding boxes), they lack the capacity to reason about causal implications. Conversely, Large Language Models (LLMs) possess general reasoning capabilities but lack visual grounding. We define the \textbf{Semantic Gap} as the disconnect between the visual feature representation $V$ (e.g., pixel patterns of a yellow leaf) and the domain-specific knowledge $K$ required to diagnose the cause (e.g., distinguishing between nitrogen deficiency and early blight).
+
+Relying solely on generative models to bridge this gap introduces the problem of \textbf{Hallucination}. Given a user query $Q$ and a visual context $I$, a standard LLM generates a response $\hat{y}$ by maximizing the probability of the next token based on training correlations rather than factual correctness:
+\[ \hat{y} = \arg\max_y P(y | I, Q) \]
+
+Without external grounding, the model may generate plausible but factually incorrect agronomic advice. This necessitates a retrieval mechanism $R$ to condition the generation on verified documents $D$, altering the objective to maximize $P(y | I, Q, R(Q))$, ensuring the output is grounded in retrieved evidence rather than parametric memory alone.
 
 %3.2.1 The Data Scarcity Problem: High cost of annotation for rare pests.
 %
@@ -30,13 +48,107 @@ Furthermore, the integration of Large Language Models (LLMs) has given rise to \
 %3.2.3 The Semantic Gap: The disconnect between detecting a "spot" and knowing it is "Early Blight."
 \section{Review of Single-Modality Approaches}
 
+Most research in agricultural AI focuses on either only images or only text. While these models work well for specific tasks, they have several problems when used for automatic crop management in real fields.
+
+\subsection{Limitations of Vision-Only Supervised Detectors}
+Supervised deep learning models, particularly CNNs and the YOLO family, have been the cornerstone of plant disease detection \cite{kamilaris2018deep, ferentinos2018deep}. However, these models exhibit significant technical drawbacks when deployed outside of curated datasets:
+
+\begin{itemize}
+	\item \textbf{Data Bias and Overfitting:} Mohanty et al. \cite{mohanty2016using} demonstrated high accuracy on the PlantVillage dataset, but subsequent studies by Barbedo \cite{barbedo2018impact} found that these models rely on "shallow" features like leaf shape or background color rather than the actual pathology. When the background shifts from a laboratory setting to a complex field, performance degrades significantly.
+	\item \textbf{The Feature Dependency Gap:} In supervised learning, a classifier $f(x)$ learns a mapping from high-dimensional pixels to a class index $y \in \{0, \dots, N\}$. Because the model lacks a semantic understanding of the label, it cannot distinguish between a "Bacterial Spot" and a visually similar artifact (e.g., a mud splash or shadow) unless it was explicitly trained on those "negative" examples.
+	\item \textbf{High Cost of Annotation:} Annotation engineering is labor-intensive. Manually labeling thousands of bounding boxes for every new pest strain is a non-scalable process for global agronomy.
+\end{itemize}
+
+\subsection{Limitations of Text-Only Large Language Models}
+While LLMs have shown sophisticated reasoning for agronomic decision support, they operate in a state of "Visual Blindness." The technical limitations include:
+
+\begin{itemize}
+	\item \textbf{Subjectivity in Symptom Description:} Without a vision-language alignment, the system relies on human-provided text descriptions. As noted in recent evaluations \cite{kasneci2023chatgpt}, this introduces a "Semantic Gap" where the user's subjective description of a leaf ("yellow spots") may not align with the scientific definition required for an accurate diagnosis.
+	\item \textbf{Lack of Spatial Grounding:} Text-only models cannot localize an infection. In a field scenario, knowing \textit{what} a disease is is insufficient without knowing \textit{where} it is and its \textit{severity density}. This lack of spatial context prevents LLMs from being used for localized spray planning or robotic intervention.
+	\item \textbf{Hallucination Risk:} LLMs generate responses based on token probabilities $P(y|Q)$ rather than physical evidence. In agricultural contexts, a "plausible-sounding" but incorrect pesticide recommendation can lead to crop death or environmental damage.
+\end{itemize}
+
+\section{Review of Multi-Modal and Foundation Models}
+
+The current State-of-the-Art (SOTA) in agricultural perception is represented by the move toward multimodal foundation models. A technical overview of these models' adaptation to the agricultural domain is given in this section, with particular attention to grounded reasoning, open-set detection, and semantic verification.
 %3.3.1 Limitations of Supervised Detectors (YOLOv8, SSD) regarding unseen classes.
 %
 %3.3.2 Limitations of Text-Only LLMs regarding visual context (Hallucination).
-\section{Review of Multi-Modal Approaches}
+\subsection{Open-Set Object Detection (Grounding DINO)}
+Grounding DINO \cite{liu2023grounding} has recently emerged as a solution for agricultural tasks where traditional closed-set annotations are difficult to acquire. Recent studies have explored its application in diverse field scenarios:
+\begin{itemize}
+	\item \textbf{Few-Shot Adaptation:} Research by researchers on agricultural datasets (e.g., GWHD, PhenoBench) demonstrates that Grounding DINO can achieve up to 24\% higher mAP than fully fine-tuned YOLO models under few-shot conditions \cite{agri_dino_2024}. This proves its ability to localize complex features like wheat heads and insect pests with minimal training data.
+	\item \textbf{Livestock Monitoring:} In cattle management, Grounding DINO has been utilized for muzzle detection without any task-specific training, achieving a mean Average Precision (mAP@0.5) of 76.8\%. This highlights the model's robustness in varied environmental backgrounds.
+	\item \textbf{Auto-Labeling Teacher Models:} Some frameworks employ Grounding DINO to automatically generate labels for smaller, real-time models (like YOLO), significantly reducing the manual annotation burden in agricultural computer vision.
+\end{itemize}
+
+\subsection{Contrastive Vision-Language Verification (CLIP)}
+To address the precision-recall trade-off in open-set detection, researchers are increasingly utilizing CLIP \cite{radford2021learning} as a semantic filter. 
+\begin{itemize}
+	\item \textbf{Multimodal Disease Classification:} Studies utilizing the PlantVillage and FieldPlant datasets have demonstrated that augmenting visual models with CLIP's textual annotations leads to notable gains in F1-score over vision-only baselines \cite{clip_plant_2024}. These systems use textual descriptions of symptoms (e.g., "irregular brown lesions with yellow halos") to provide a more sophisticated interpretation of the visual data.
+	\item \textbf{Few-Shot Frameworks (VLCD):} The Vision-Language model for Crop Disease (VLCD) framework integrates CLIP to improve few-shot classification accuracy. By using a "Cache Model" to blend CLIP's prior knowledge with task-specific training features, researchers have achieved high accuracy in identifying crop leaf diseases with very few samples.
+\end{itemize}
+
+\subsection{Retrieval-Augmented Generation (RAG)}
+The most recent evolution in agricultural decision support is the deployment of Agentic RAG systems to mitigate the hallucination risks of standard LLMs.
+\begin{itemize}
+	\item \textbf{AgroLLM and Expert Chatbots:} Frameworks like AgroLLM \cite{agrollm2024} deliver contextually relevant responses derived from a comprehensive corpus of agricultural textbooks and scientific articles. This "non-parametric" grounding ensures that the advice provided is factually accurate and geographically relevant.
+	\item \textbf{Q\&A Systems for Pest Management:} Recent Q\&A systems developed for crop pests use adaptive retrieval to handle diverse farmer queries. By combining knowledge graphs with RAG, these systems can refine search queries to retrieve specific pesticide protocols and outbreak patterns, significantly reducing the probability of erroneous diagnostic advice.
+\end{itemize}
+
+
+
 %3.4.1 Existing Visual Question Answering (VQA) systems in Agronomy.
 %
 %3.4.2 Recent applications of Foundation Models (DINO/SAM) in agriculture.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \section{Research Gap}
-%Synthesis: Lack of systems that integrate Active Perception (SAHI + DINO) with Structured Reasoning (Agentic RAG) into a unified, autonomous pipeline.
+The primary research gap identified in this study is the \textbf{lack of an orchestrated agentic workflow} that unifies perception, verification, and reasoning. Specifically:
+\begin{enumerate}
+	\item \textbf{Absence of Semantic Verification:} While open-set detectors like Grounding DINO offer high recall, there is a lack of research into using contrastive models (CLIP) as a real-time Verifier to suppress the false positives inherent in unstructured field data.
+	\item \textbf{The Perception-Reasoning Disconnect:} There is a distinct absence of Agentic RAG implementations where a vision system's output directly initializes a scientific retrieval process without human intervention.
+	\item \textbf{Lack of Actionable Autonomy:} Most current models provide a \textit{label} (e.g., ``Tomato Leaf Mold''), but they do not provide a \textit{verified treatment plan} grounded in real-time localized knowledge.
+\end{enumerate}
+
+To bridge these gaps, this thesis proposes an ``Autonomous Multimodal Agronomy Agent''. By moving away from the individual assumption of single-task models, this work establishes a unified loop of \textit{Observe $\rightarrow$ Verify $\rightarrow$ Reason $\rightarrow$ Act}. This architectural method is essential for transitioning from simple disease detection to autonomous crop health management.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%\section{Review of Multi-Modal and Foundation Models}
+%
+%To address the bottlenecks of closed-set supervision, the field has transitioned toward Vision-Language Models (VLMs) that utilize shared latent spaces. This section reviews the three pillars of the proposed agent: open-set perception, contrastive verification, and retrieval-augmented reasoning.
+%
+%\subsection{Open-Set Object Detection (Grounding DINO)}
+%Grounding DINO \cite{liu2023grounding} extends the DINO architecture by incorporating language-guided queries. The core technical innovation is the \textbf{Feature Enhancer}, which performs "Neck Fusion" between visual and textual modalities. Unlike standard detectors that use a fixed classification head, Grounding DINO employs \textbf{Cross-Modality Attention} to align image features $I$ with text features $T$.
+%
+%Mathematically, for a query $Q$, key $K$, and value $V$, the attention mechanism is defined as:
+%\[ \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V \]
+%
+%In the feature enhancer, the visual features $V_{vis}$ are updated by attending to the language features $T_{lang}$:
+%\[ V_{vis}^{'} = \text{Cross-Attn}(Q=V_{vis}, K=T_{lang}, V=T_{lang}) \]
+%
+%This allows the model to localize objects dynamically based on the input string, effectively solving the "Open-Set" problem by treating detection as a phrase-grounding task.
+%
+%\subsection{Contrastive Verification (CLIP)}
+%While Grounding DINO serves as a powerful observer, its open-vocabulary nature can lead to high-recall but low-precision detections. To mitigate this, Contrastive Language-Image Pre-training (CLIP) \cite{radford2021learning} is employed as a semantic filter. CLIP is trained using a \textbf{Contrastive Loss} (InfoNCE) that maximizes the cosine similarity of $N$ correct pairs $(I_i, T_i)$ in a batch while minimizing it for $N^2 - N$ incorrect pairs.
+%
+%For a batch of image embeddings $i$ and text embeddings $t$, the symmetric cross-entropy loss $L$ is formulated as:
+%\[ L = -\frac{1}{2} \left[ \sum_{i=1}^{N} \log \frac{\exp(\text{sim}(I_i, T_i)/\tau)}{\sum_{j=1}^{N} \exp(\text{sim}(I_i, T_j)/\tau)} + \sum_{i=1}^{N} \log \frac{\exp(\text{sim}(I_i, T_i)/\tau)}{\sum_{j=1}^{N} \exp(\text{sim}(T_i, I_j)/\tau)} \right] \]
+%
+%Where $\tau$ is a learnable temperature parameter. In our system, this allows the agent to verify if a "detected" pest visually aligns with the botanical definition of that pest, effectively acting as a "zero-shot verifier" that requires no domain-specific retraining.
+%
+%\subsection{Retrieval-Augmented Generation (RAG)}
+%The reasoning layer of the agent utilizes Retrieval-Augmented Generation \cite{lewis2020retrieval} to ground the output of the Large Language Model. RAG separates knowledge into two components:
+%\begin{enumerate}
+%	\item \textbf{Parametric Memory:} The internal weights of the LLM (e.g., Llama-3 or GPT-4).
+%	\item \textbf{Non-Parametric Memory:} A vector database (e.g., ChromaDB) containing verified agronomic documents $D$.
+%\end{enumerate}
+%
+%Given a detection $c$, the system retrieves the top-$k$ relevant documents from $D$ based on the embedding similarity $\text{sim}(\phi(c), \phi(D))$. The final diagnosis $y$ is generated by conditioning the model on both the visual context and the retrieved facts:
+%\[ y \sim P(y | I, c, D_{k}) \]
+%
+%This architecture effectively bridges the "Semantic Gap" and ensures that the agent's advice is verifiable and grounded in scientific literature rather than speculative generation.

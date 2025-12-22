@@ -188,7 +188,7 @@ breaklinks=true,
 	\input{titlepage}
 	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	\chapter*{\centering{Declaration of Authenticity}}
-	We declare that this research is our own work, conducted under the supervision and guidance of Assoc. Prof. Nguyen Manh Hung. The result of our research is legitimate and has not been published in any forms prior to this. All materials used within this researched are collected ourself by various sources and are appropriately listed in the references section. \\
+	I declare that this research is our own work, conducted under the supervision and guidance of Dr. Nguyen Quang Hung. The result of our research is legitimate and has not been published in any forms prior to this. All materials used within this researched are collected myself by various sources and are appropriately listed in the references section. \\
 	
 	In addition, within this research, we also used the results of several other authors and organizations. They have all been aptly referenced. \\
 	
@@ -199,15 +199,19 @@ breaklinks=true,
 		Tran Quoc Anh \\
 	\end{flushright}
 	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	\chapter*{\centering{Acknowledgment}}
-	We would like to acknowledge and express our gratitude to everyone who have supported us during our university life. Not only the professors in Ho Chi Minh City University of Technology who have taught us immense knowledge and given us their aspiring guidance, invaluable constructive criticism and friendly advice, but also our friends and our family members of each member in our team who let us have a good physical and mental health during our study.
-	
-	Foremost, we would like to give our sincere gratitude to our supervisor, Associate Professor Ph.D Nguyen Manh Hung as well as our mentors for their continuous support. Their guidance has brought up our motivation and enthusiasm in research for this thesis. We could not have imagined having a better support for our study.
-	
-	Last but not least, we would like to thank Ho Chi Minh City University of Technology for giving us the opportunity to learn great lessons of theory and practical experience in the field of Computer Science.
+%	\chapter*{\centering{Acknowledgment}}
+%	We would like to acknowledge and express our gratitude to everyone who have supported us during our university life. Not only the professors in Ho Chi Minh City University of Technology who have taught us immense knowledge and given us their aspiring guidance, invaluable constructive criticism and friendly advice, but also our friends and our family members of each member in our team who let us have a good physical and mental health during our study.
+%	
+%	Foremost, we would like to give our sincere gratitude to our supervisor, Associate Professor Ph.D Nguyen Manh Hung as well as our mentors for their continuous support. Their guidance has brought up our motivation and enthusiasm in research for this thesis. We could not have imagined having a better support for our study.
+%	
+%	Last but not least, we would like to thank Ho Chi Minh City University of Technology for giving us the opportunity to learn great lessons of theory and practical experience in the field of Computer Science.
 	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	\chapter*{\centering{Abstract}}
-	Online social networks, such as Twitter and Facebook, have become an important part of people's daily lives in recent years since they allow them to connect with others, communicate with friends, share personal content with others, and obtain information, especially during the ongoing worldwide disaster---the COVID-19 pandemic. However, it also creates opportunities for social bots that are designed to replicate the behaviors of normal human accounts. Most of these bots are used for nefarious purposes such as disseminating false information, artificially amplifying the popularity of a person or movement or spreading spam. This proposal presents a review of some techniques that have emerged and designed to differentiate between social bot accounts and human accounts. We restrict the analysis to the detection of social bots on the Twitter social media platform for the time being, with plans to expand to Facebook later. We also compare the experiments of each technique on two different data sets to point out the most accurate one. Besides experimenting, our final destination is to develop a social bot detection tool that can be deployed as a web application. Finally, we highlight the challenges that remain in the domain of social bots detection and consider future directions for research efforts that are designed to address this problem.
+	Agriculture faces growing threats from diseases and climate change, making autonomous health management systems essential. Most current Artificial Intelligence systems rely on ``closed-set'' detectors that map inputs to a fixed list of known classes. These models often fail in real field conditions and cannot identify new pests without constant retraining. Additionally, there is a ``Semantic Gap'' between simply detecting a symptom and providing actual farming advice.
+	
+	This thesis proposes an Autonomous Multimodal Agronomy Agent designed to bridge these gaps by unifying open-set perception with expert-level reasoning. The proposed architecture functions through a structured ``Observe $\rightarrow$ Verify $\rightarrow$ Reason  $\rightarrow$ Act'' loop. First, the system utilizes Grounding DINO\cite{liu2023grounding} to perform open-set object detection, enabling the identification of pests and diseases-ranging from general-purpose anomalies to specific Vietnamese crops on arbitrary natural language descriptions rather than predefined labels. Second, a fine-tuned CLIP\cite{radford2021learning} (Contrastive Language-Image Pre-training) model filters out false positives by matching visual data with scientific descriptions in a shared embedding space. Finally, an Agentic Retrieval-Augmented Generation (RAG) engine links these findings to a database of agricultural literature. This ensures that the final reports for farmers are fact-based and free from model hallucinations.
+	
+	While these individual technologies are powerful, this work focuses on integrating them into a unified workflow capable of handling complex, whole-plant imagery. By moving beyond simple leaf classification, this framework offers a scalable way to deliver expert-level recommendations directly to agricultural practitioners.
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	\tableofcontents
@@ -226,7 +230,7 @@ breaklinks=true,
 	\input{theory.tex}
 	\input{works.tex}
 	\input{method.tex}
-	\input{data.tex}
+%	\input{data.tex}
 	\input{app.tex}
 	\input{result.tex}
 	
