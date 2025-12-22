@@ -20,7 +20,7 @@ class DiagnosisResult(BaseModel):
 
 # 2. The Model
 provider = GoogleProvider(api_key=os.getenv("GOOGLE_API_KEY"))
-model = GoogleModel('gemini-2.5-flash', provider=provider)
+model = GoogleModel('gemini-2.5-flash-lite', provider=provider)
 # model = GeminiModel('gemini-1.5-flash', api_key=os.getenv("GOOGLE_API_KEY"))
 
 # 3. The Agent

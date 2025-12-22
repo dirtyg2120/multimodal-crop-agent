@@ -19,7 +19,7 @@ Settings.embed_model = GoogleGenAIEmbedding(
     embedding_config=EmbedContentConfig(output_dimensionality=768)
 )
 Settings.llm = GoogleGenAI(
-    model_name="gemini-2.0-flash",
+    model_name="gemini-2.5-flash-lite",
     api_key=GOOGLE_API_KEY
 )
 

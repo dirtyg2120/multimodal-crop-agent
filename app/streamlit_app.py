@@ -97,14 +97,14 @@ def main():
 
     uploaded_file = st.file_uploader("Upload Crop Image", type=["jpg", "jpeg", "png"])
 
-    caption = st.text_input("Caption", value=TEXT_PROMPT, help="Text prompt for GroundingDINO")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        box_threshold = st.slider("box_threshold", 0.00, 1.00, 0.30, 0.01)
-    with col_b:
-        text_threshold = st.slider("text_threshold", 0.00, 1.00, 0.25, 0.01)
-
     if uploaded_file:
+        caption = st.text_input("Caption", value=TEXT_PROMPT, help="Text prompt for GroundingDINO")
+        col_box, col_txt = st.columns(2)
+        with col_box:
+            box_threshold = st.slider("box_threshold", 0.00, 1.00, 0.30, 0.01)
+        with col_txt:
+            text_threshold = st.slider("text_threshold", 0.00, 1.00, 0.25, 0.01)
+
         # Save temp file because load_image expects a path
         temp_path = "temp_uploaded_image.jpg"
         with open(temp_path, "wb") as f:
