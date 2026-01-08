@@ -140,7 +140,6 @@ def main():
                     st.image(annotated_frame, caption="Detections (Grounding DINO)", width="content")
 
             # --- STEP B: Extract Crops ---
-            # Note: extract_crops expects the numpy array (image_source)
             crops_data = extract_crops(image_source, boxes, phrases)
             st.success(f"Found {len(crops_data)} objects.")
 
@@ -167,6 +166,8 @@ def main():
             k3.metric("Infection Ratio", f"{agent_json.infection_ratio:.0%}")
             
             with st.expander("Treatment Plan", expanded=True):
+                st.info(f"**AI Reasoning:** {agent_json.reasoning}")
+
                 st.write("**Recommended Actions:**")
                 for action in agent_json.recommended_actions:
                     st.write(f"- {action}")

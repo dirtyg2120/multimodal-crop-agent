@@ -11,7 +11,7 @@ class DetectedObject:
 @dataclass
 class AgronomyDeps:
     user_id: str
-    crop_name: str  # <--- ADD THIS BACK (e.g., "Tomato")
+    crop_name: str
     total_leaves: int
     healthy_count: int
     disease_counts: Dict[str, int]

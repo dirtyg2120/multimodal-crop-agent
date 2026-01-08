@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image
 from collections import Counter
 from transformers import CLIPModel, CLIPProcessor
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from app.agent.deps import AgronomyDeps, DetectedObject
 from app.agent.core import agronomy_agent
@@ -94,7 +95,7 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
             if " leaf " in label:
                 dominant_crop = label.split(" leaf ")[0]
                 break
-            elif "Healthy":
+            elif "Healthy" in label:
                 dominant_crop = label.replace("Healthy ", "").replace(" leaf", "")
                 break
             else:
@@ -115,7 +116,7 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
     # We summarize the situation for the LLM so it doesn't have to do math.
     summary_text = (
         f"Analysis Report:\n"
-        f"- Total Leaves: {deps.total_leaves}\n"
+        f"- Total detected objects: {deps.total_leaves}\n"
         f"- Healthy: {deps.healthy_count}\n"
         f"- Diseases: {deps.disease_counts}\n"
         f"- Pests: {deps.pest_counts}\n"
@@ -131,19 +132,22 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
 
     print(f"   🧠 [Agent] Reasoning ...")
 
-    testing = False
-    if not testing:
-        result = await agronomy_agent.run(user_prompt, deps=deps)
-        output = result.output
-        # print(output.model_dump_json(indent=4))
+    try:
+        testing = False
+        if not testing:
+            result = await agronomy_agent.run(user_prompt, deps=deps)
+            output = result.output
+            print(output.model_dump_json(indent=4))
+        else:
+            output = sample.output
+    except UnexpectedModelBehavior as e:
+        print(f"DEBUG INFO: {e}")
     else:
-        output = sample.output
-    
-    return {
-        "detections": detected_objects,
-        "stats": deps,
-        "agent_response": output
-    }
+        return {
+            "detections": detected_objects,
+            "stats": deps,
+            "agent_response": output
+        }
 
 if __name__ == "__main__":
     print("nothing")
