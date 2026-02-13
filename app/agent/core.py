@@ -23,8 +23,8 @@ class DiagnosisResult(BaseModel):
     @model_validator(mode='after')
     def check_logical_consistency(self):
         """
-        This runs AFTER the LLM generates JSON. 
-        If it fails, the error message is sent back to the LLM to 'Try Again'.
+        Self-Correction Validator:
+        Intercepts logic errors and guides the LLM to fix them.
         """
         # Rule 1: Don't starve the user
         if not self.recommended_actions:
@@ -32,7 +32,11 @@ class DiagnosisResult(BaseModel):
 
         # Rule 2: High Severity requires strong action
         if self.severity_level == "High" and (not self.required_pesticides or len(self.required_pesticides) == 0):
-            raise ModelRetry("Self-Correction: You marked severity as 'High' but provided no chemical/pesticide names. For high severity, you MUST list specific active ingredients found in the manual.")
+            raise ModelRetry(
+                "Self-Correction: You marked severity as 'High' but provided no chemical names. "
+                "If the manual lookup failed, you MUST recommend standard active ingredients "
+                "(e.g., 'Copper Fungicide', 'Neem Oil', 'Imidacloprid') based on your internal general agronomic principles."
+            )
 
         # Rule 3: Math check (Hallucination guard)
         if self.severity_level == "Low" and self.infection_ratio > 0.4:
@@ -50,7 +54,7 @@ agronomy_agent = Agent(
     model,
     deps_type=AgronomyDeps,
     output_type=DiagnosisResult,
-    retries=1,
+    retries=3,
     system_prompt=(
         "You are an expert Autonomous Agronomist. "
         "You will receive an aggregate census of a plant's health. "
@@ -60,7 +64,7 @@ agronomy_agent = Agent(
         "   - < 20% infected: Low Severity (Prune/Monitor).\n"
         "   - 20-50% infected: Medium Severity (Organic sprays).\n"
         "   - > 50% infected: High Severity (Chemical intervention).\n"
-        "   - **Tool Usage:** You MUST use `consult_ipm_manual` for every disease found (leaf only).\n\n"
+        "   - **Tool Usage:** You MUST use `consult_ipm_manual` for every 'disease_counts' found on crop (Do not use for insect, bug, ...).\n\n"
 
         "### 2. PEST PROTOCOL (Based on 'pest_counts')\n"
         "   - **Beneficial Insects:** (e.g., Ladybug, Bee, Spider, Wasp, Dragonfly)\n"
@@ -76,6 +80,6 @@ agronomy_agent = Agent(
 
         # "CRITICAL VALIDATION RULES (Do not violate these or you will be rejected):\n"
         # "- If `detected_beneficials` is True, `is_chemical_recommended` MUST be False.\n"
-        # "- You MUST provide a `reasoning_trace` before your final plan."
+        "- You MUST provide a `reasoning_trace` before your final plan."
     )
 )

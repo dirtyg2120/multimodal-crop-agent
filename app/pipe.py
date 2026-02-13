@@ -79,7 +79,7 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
             pest_tally[pest_name] += 1
             
             detected_objects.append(DetectedObject(
-                label=f"Pest: {pest_name}", confidence=conf, box=item['bbox'], crop_id=i
+                label=f"{pest_name}", confidence=conf, box=item['bbox'], crop_id=i
             ))
 
     # DINO Results (Pests)
