@@ -1,0 +1,286 @@
+# Test Cases for Component Analysis (Experiment 5.4)
+#
+# Each test case validates specific agent behaviors:
+# - Disease severity assessment
+# - Pest conflict resolution (beneficial vs harmful)
+# - RAG integration
+# - Self-correction validators
+#
+# Recommended: 10-15 test cases for thesis validation
+
+test_cases:
+  # ============================================================================
+  # DISEASE SEVERITY TESTS (High, Medium, Low)
+  # ============================================================================
+  
+  - id: TC001
+    name: "High Disease Severity + Harmful Pest"
+    description: "Tests high severity detection and chemical recommendation"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 7
+      healthy_count: 1
+      disease_counts:
+        "Early blight": 6
+      pest_counts:
+        "Aphid": 4
+    ground_truth:
+      severity_level: "High"
+      overall_health_status: "Severe Infestation"
+      should_have_pesticides: true
+      should_mention_disease: "Early blight"
+      should_mention_pest: "Aphid"
+      infection_ratio_range: [0.80, 0.90]
+
+  - id: TC002
+    name: "Medium Disease Severity"
+    description: "Tests medium severity with organic treatment recommendation"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 8
+      healthy_count: 5
+      disease_counts:
+        "Septoria leaf spot": 3
+      pest_counts: {}
+    ground_truth:
+      severity_level: "Medium"
+      infection_ratio_range: [0.30, 0.45]
+      should_mention_disease: "Septoria leaf spot"
+
+  - id: TC003
+    name: "Low Disease Severity"
+    description: "Tests low severity with preventive measures"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 10
+      healthy_count: 8
+      disease_counts:
+        "Leaf Mold": 2
+      pest_counts: {}
+    ground_truth:
+      severity_level: "Low"
+      infection_ratio_range: [0.15, 0.25]
+      should_have_pesticides: false
+
+  # ============================================================================
+  # PEST CONFLICT RESOLUTION TESTS
+  # ============================================================================
+
+  - id: TC004
+    name: "Beneficial vs Harmful Conflict"
+    description: "Tests conflict resolution - should avoid chemicals to protect beneficial insects"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 5
+      healthy_count: 4
+      disease_counts: {}
+      pest_counts:
+        "Aphid": 3
+        "Ladybug": 2
+    ground_truth:
+      severity_level: "Low"
+      should_avoid_chemicals: true
+      should_mention_beneficial: "Ladybug"
+      should_recommend_mechanical: true
+
+  - id: TC005
+    name: "Only Beneficial Insects"
+    description: "Tests protection of beneficial insects"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 6
+      healthy_count: 6
+      disease_counts: {}
+      pest_counts:
+        "Ladybug": 2
+        "Bee": 1
+    ground_truth:
+      severity_level: "Low"
+      overall_health_status: "Healthy"
+      should_have_pesticides: false
+      should_mention_beneficial: "Ladybug"
+
+  - id: TC006
+    name: "High Harmful Pest Population"
+    description: "Tests chemical recommendation for severe pest infestation"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 8
+      healthy_count: 7
+      disease_counts: {}
+      pest_counts:
+        "Aphid": 12
+        "Whitefly": 8
+    ground_truth:
+      should_have_pesticides: true
+      should_mention_pest: "Aphid"
+
+  # ============================================================================
+  # HEALTHY PLANT TESTS
+  # ============================================================================
+
+  - id: TC007
+    name: "Completely Healthy Plant"
+    description: "Tests correct identification of healthy plants"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 6
+      healthy_count: 6
+      disease_counts: {}
+      pest_counts: {}
+    ground_truth:
+      severity_level: "Low"
+      overall_health_status: "Healthy"
+      should_have_pesticides: false
+      infection_ratio_range: [0.0, 0.1]
+
+  # ============================================================================
+  # COMPLEX MULTI-ISSUE TESTS
+  # ============================================================================
+
+  - id: TC008
+    name: "Multiple Diseases"
+    description: "Tests handling of multiple concurrent diseases"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 10
+      healthy_count: 2
+      disease_counts:
+        "Early blight": 5
+        "Late blight": 3
+      pest_counts: {}
+    ground_truth:
+      severity_level: "High"
+      should_mention_disease: ["Early blight", "Late blight"]
+      infection_ratio_range: [0.75, 0.85]
+      should_have_pesticides: true
+
+  - id: TC009
+    name: "Disease + Beneficial + Harmful Pests"
+    description: "Tests complex scenario with disease and mixed pests"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 8
+      healthy_count: 3
+      disease_counts:
+        "Bacterial spot": 5
+      pest_counts:
+        "Aphid": 4
+        "Ladybug": 2
+    ground_truth:
+      severity_level: "High"
+      should_mention_disease: "Bacterial spot"
+      should_avoid_chemicals: true  # Because of ladybugs
+      should_mention_beneficial: "Ladybug"
+
+  - id: TC010
+    name: "Low Disease + High Pest"
+    description: "Tests prioritization when disease is low but pests are high"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 10
+      healthy_count: 8
+      disease_counts:
+        "Leaf Mold": 2
+      pest_counts:
+        "Aphid": 15
+    ground_truth:
+      should_have_pesticides: true
+      should_mention_pest: "Aphid"
+
+  # ============================================================================
+  # EDGE CASES
+  # ============================================================================
+
+  - id: TC011
+    name: "Borderline Medium-High Severity"
+    description: "Tests boundary between medium and high severity"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 10
+      healthy_count: 5
+      disease_counts:
+        "Early blight": 5
+      pest_counts: {}
+    ground_truth:
+      severity_level: "Medium"  # Exactly 50%
+      infection_ratio_range: [0.45, 0.55]
+
+  - id: TC012
+    name: "Single Leaf Infected"
+    description: "Tests minimal infection scenario"
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 10
+      healthy_count: 9
+      disease_counts:
+        "Septoria leaf spot": 1
+      pest_counts: {}
+    ground_truth:
+      severity_level: "Low"
+      infection_ratio_range: [0.05, 0.15]
+      should_have_pesticides: false
+
+  # ============================================================================
+  # DIFFERENT CROP TESTS (Optional - add if you have multi-crop data)
+  # ============================================================================
+
+  - id: TC013
+    name: "Durian Leaf Blight"
+    description: "Tests RAG retrieval for different crop"
+    deps:
+      user_id: "test"
+      crop_name: "Durian"
+      total_leaves: 8
+      healthy_count: 3
+      disease_counts:
+        "Leaf Blight": 5
+      pest_counts: {}
+    ground_truth:
+      severity_level: "High"
+      should_mention_disease: "Leaf Blight"
+      infection_ratio_range: [0.60, 0.70]
+
+  - id: TC014
+    name: "Durian with Beneficial Insects"
+    description: "Tests crop-specific pest handling"
+    deps:
+      user_id: "test"
+      crop_name: "Durian"
+      total_leaves: 6
+      healthy_count: 5
+      disease_counts: {}
+      pest_counts:
+        "Bee": 3
+    ground_truth:
+      overall_health_status: "Healthy"
+      should_have_pesticides: false
+      should_mention_beneficial: "Bee"
+
+  - id: TC015
+    name: "Unknown Crop Stress Test"
+    description: "Tests agent behavior with crop not in RAG database"
+    deps:
+      user_id: "test"
+      crop_name: "Dragon Fruit"
+      total_leaves: 7
+      healthy_count: 3
+      disease_counts:
+        "Unknown Disease": 4
+      pest_counts: {}
+    ground_truth:
+      severity_level: "High"
+      infection_ratio_range: [0.50, 0.65]
+      # Agent should fall back to general knowledge
