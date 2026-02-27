@@ -21,4 +21,4 @@ app/groundingdino
 report/report.*
 report/*.tex~
 
-evaluations/data/*
+evaluations/data/plantvillage/*
