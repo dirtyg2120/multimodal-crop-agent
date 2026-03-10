@@ -22,3 +22,6 @@ report/report.*
 report/*.tex~
 
 evaluations/data/plantvillage/*
+
+evaluations/results/*
+evaluations/data/*
