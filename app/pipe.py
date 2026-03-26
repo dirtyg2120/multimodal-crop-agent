@@ -11,97 +11,73 @@ from app.vision.clip_labels import CLIP_LABEL_MAP, INSECT_LABELS
 from app import sample
 import app.agent.tools
 
-
-# load_dotenv()
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+CLIP_CONFIDENCE_THRESHOLD = 0.35  # below this → "Unknown" (open-set rejection)
 
-# --- 1. DEFINE THE CLASS (Do not instantiate it here) ---
+
 class VisionSystem:
     def __init__(self):
         print("   🚜 Loading Vision Models...")
-        # Plant Disease Model
         self.plant_model = CLIPModel.from_pretrained("Keetawan/clip-vit-large-patch14-plant-disease-finetuned").to(DEVICE)
         self.plant_processor = CLIPProcessor.from_pretrained("Keetawan/clip-vit-large-patch14-plant-disease-finetuned")
-        
-        # Insect Model (BioCLIP)
-        # self.insect_model = CLIPModel.from_pretrained("imageomics/bioclip").to(DEVICE)
-        # self.insect_processor = CLIPProcessor.from_pretrained("imageomics/bioclip")
         self.insect_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(DEVICE)
         self.insect_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
         print("   ✅ Models Loaded.")
 
     def classify_leaf(self, image_crop: np.ndarray):
-        return self._run_clip(
-            image_crop, list(CLIP_LABEL_MAP.values()), self.plant_model, self.plant_processor
-        )
+        return self._run_clip(image_crop, list(CLIP_LABEL_MAP.values()), self.plant_model, self.plant_processor)
 
     def classify_pest(self, image_crop: np.ndarray):
-        return self._run_clip(
-            image_crop, INSECT_LABELS, self.insect_model, self.insect_processor
-        )
+        return self._run_clip(image_crop, INSECT_LABELS, self.insect_model, self.insect_processor)
 
     def _run_clip(self, image_crop, labels, model, processor):
         pil_image = Image.fromarray(image_crop)
         inputs = processor(text=labels, images=pil_image, return_tensors="pt", padding=True).to(DEVICE)
         with torch.no_grad():
-            outputs = model(**inputs)
-            probs = outputs.logits_per_image.softmax(dim=1)
+            probs = model(**inputs).logits_per_image.softmax(dim=1)
         top_prob, top_idx = probs[0].max(dim=0)
-        return labels[top_idx.item()], top_prob.item()
+        top_prob_val = top_prob.item()
+        if top_prob_val < CLIP_CONFIDENCE_THRESHOLD:
+            return "Unknown", top_prob_val
+        return labels[top_idx.item()], top_prob_val
 
 
-# async def run_pipeline(clip_class_id: int, confidence: float):
 async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
     print("--- 🚜 Starting Agronomy Agent Pipeline 🚜 ---")
-    
+
     detected_objects = []
     disease_tally = Counter()
     pest_tally = Counter()
     healthy_count = 0
-    
-    # CLIP Loop
+
     for i, item in enumerate(crops_data):
         label_lower = item['label'].lower()
-
         if "leaf" in label_lower:
             full_label, conf = vision_system.classify_leaf(item['crop'])
-            if "Healthy" in full_label:
+            if full_label == "Unknown":
+                disease_tally["Unknown disease"] += 1
+                print(f"   ⚠️  Leaf {i}: low confidence ({conf:.2f}) → flagged as Unknown")
+            elif "Healthy" in full_label:
                 healthy_count += 1
             else:
                 disease_name = full_label.split(" with ")[-1] if " with " in full_label else full_label
                 disease_tally[disease_name] += 1
-            
-            detected_objects.append(DetectedObject(
-                label=full_label, confidence=conf, box=item['bbox'], crop_id=i
-            ))
+            detected_objects.append(DetectedObject(label=full_label, confidence=conf, box=item['bbox'], crop_id=i))
         else:
             pest_name, conf = vision_system.classify_pest(item['crop'])
             pest_tally[pest_name] += 1
-            
-            detected_objects.append(DetectedObject(
-                label=f"{pest_name}", confidence=conf, box=item['bbox'], crop_id=i
-            ))
+            detected_objects.append(DetectedObject(label=f"{pest_name}", confidence=conf, box=item['bbox'], crop_id=i))
 
-    # DINO Results (Pests)
-    # e.g., dino_results = {"leaf": 7, "beetle": 2}
-    # pest_tally = {k: v for k, v in dino_results.items() if k != 'leaf'}
-
+    # Determine dominant crop from first identified leaf
     dominant_crop = "General"
-    if detected_objects:
-        # "Tomato leaf with..." -> "Tomato"
-        # "Healthy Tomato leaf" -> "Tomato"
-        for obj in detected_objects:
-            label = obj.label
-            if " leaf " in label:
-                dominant_crop = label.split(" leaf ")[0]
-                break
-            elif "Healthy" in label:
-                dominant_crop = label.replace("Healthy ", "").replace(" leaf", "")
-                break
-            else:
-                continue
+    for obj in detected_objects:
+        if " leaf " in obj.label:
+            dominant_crop = obj.label.split(" leaf ")[0]
+            break
+        elif "Healthy" in obj.label:
+            dominant_crop = obj.label.replace("Healthy ", "").replace(" leaf", "")
+            break
 
-    # 2. CONTEXT BUILDING (Dependency Injection)
     deps = AgronomyDeps(
         user_id="user",
         crop_name=dominant_crop,
@@ -112,8 +88,6 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
         detailed_detections=None
     )
 
-    # 3. AGENT REASONING (Construct Whole-Plant Prompt)
-    # We summarize the situation for the LLM so it doesn't have to do math.
     summary_text = (
         f"Analysis Report:\n"
         f"- Total detected objects: {deps.total_leaves}\n"
@@ -130,7 +104,7 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
         "3. **Plan:** Provide an integrated plan. If mixed infections (pests + disease) exists, prioritize the most severe threat but protect beneficial insects."
     )
 
-    print(f"   🧠 [Agent] Reasoning ...")
+    print("   🧠 [Agent] Reasoning ...")
 
     try:
         testing = False
@@ -143,11 +117,4 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
     except UnexpectedModelBehavior as e:
         print(f"DEBUG INFO: {e}")
     else:
-        return {
-            "detections": detected_objects,
-            "stats": deps,
-            "agent_response": output
-        }
-
-if __name__ == "__main__":
-    print("nothing")
+        return {"detections": detected_objects, "stats": deps, "agent_response": output}
