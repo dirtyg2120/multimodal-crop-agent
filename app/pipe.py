@@ -1,7 +1,11 @@
+import logging
 import torch
 import numpy as np
 from PIL import Image
 from collections import Counter
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+log = logging.getLogger(__name__)
 from transformers import CLIPModel, CLIPProcessor
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
@@ -12,17 +16,17 @@ from app import sample
 import app.agent.tools
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-CLIP_CONFIDENCE_THRESHOLD = 0.35  # below this → "Unknown" (open-set rejection)
+CLIP_CONFIDENCE_THRESHOLD = 0.5  # below this → "Unknown" (open-set rejection)
 
 
 class VisionSystem:
     def __init__(self):
-        print("   🚜 Loading Vision Models...")
+        log.info("🚜 Loading Vision Models...")
         self.plant_model = CLIPModel.from_pretrained("Keetawan/clip-vit-large-patch14-plant-disease-finetuned").to(DEVICE)
         self.plant_processor = CLIPProcessor.from_pretrained("Keetawan/clip-vit-large-patch14-plant-disease-finetuned")
         self.insect_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(DEVICE)
         self.insect_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
-        print("   ✅ Models Loaded.")
+        log.info("✅ Models Loaded.")
 
     def classify_leaf(self, image_crop: np.ndarray):
         return self._run_clip(image_crop, list(CLIP_LABEL_MAP.values()), self.plant_model, self.plant_processor)
@@ -43,7 +47,7 @@ class VisionSystem:
 
 
 async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
-    print("--- 🚜 Starting Agronomy Agent Pipeline 🚜 ---")
+    log.info("🚜 Starting Agronomy Agent Pipeline")
 
     detected_objects = []
     disease_tally = Counter()
@@ -56,7 +60,7 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
             full_label, conf = vision_system.classify_leaf(item['crop'])
             if full_label == "Unknown":
                 disease_tally["Unknown disease"] += 1
-                print(f"   ⚠️  Leaf {i}: low confidence ({conf:.2f}) → flagged as Unknown")
+                log.info(f"⚠️  Leaf {i}: low confidence ({conf:.2f}) → flagged as Unknown")
             elif "Healthy" in full_label:
                 healthy_count += 1
             else:
@@ -104,17 +108,17 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
         "3. **Plan:** Provide an integrated plan. If mixed infections (pests + disease) exists, prioritize the most severe threat but protect beneficial insects."
     )
 
-    print("   🧠 [Agent] Reasoning ...")
+    log.info("🧠 [Agent] Reasoning...")
 
     try:
         testing = False
         if not testing:
             result = await agronomy_agent.run(user_prompt, deps=deps)
             output = result.output
-            print(output.model_dump_json(indent=4))
+            log.info(output.model_dump_json(indent=4))
         else:
             output = sample.output
     except UnexpectedModelBehavior as e:
-        print(f"DEBUG INFO: {e}")
+        log.info(f"DEBUG INFO: {e}")
     else:
         return {"detections": detected_objects, "stats": deps, "agent_response": output}

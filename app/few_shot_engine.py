@@ -1,3 +1,9 @@
+import logging
+import os
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+log = logging.getLogger(__name__)
+import pickle
 import numpy as np
 import torch
 from PIL import Image
@@ -7,21 +13,20 @@ from transformers import CLIPModel, CLIPProcessor
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_NAME = "Keetawan/clip-vit-large-patch14-plant-disease-finetuned"
 DEFAULT_THRESHOLD = 0.82
+PROTOTYPES_PATH = "./data/few_shot_prototypes.pkl"
 
 
 class FewShotEngine:
-    """
-    Centroid-based few-shot classifier using frozen CLIP image features.
-    Prototypes are stored in-memory — no retraining, no disk I/O.
-    """
+    """Centroid-based few-shot classifier using frozen CLIP features."""
 
     def __init__(self):
-        print(f"   🔬 Loading Few-Shot CLIP on {DEVICE}...")
+        log.info(f"🔬 Loading Few-Shot CLIP on {DEVICE}...")
         self.model = CLIPModel.from_pretrained(MODEL_NAME).to(DEVICE)
         self.processor = CLIPProcessor.from_pretrained(MODEL_NAME)
         self.model.eval()
         self.prototypes: dict[str, np.ndarray] = {}
-        print("   ✅ Few-Shot Engine ready.")
+        self._load()
+        log.info(f"✅ Few-Shot Engine ready. ({len(self.prototypes)} prototypes loaded)")
 
     def _embed(self, image: Image.Image) -> np.ndarray:
         inputs = self.processor(images=image, return_tensors="pt").to(DEVICE)
@@ -31,17 +36,17 @@ class FewShotEngine:
         feat = feat / feat.norm(p=2, dim=-1, keepdim=True)
         return feat.cpu().numpy().flatten()
 
-    def register(self, label: str, support_images: list[Image.Image]) -> np.ndarray:
-        """Build and store a centroid from 3–10 support images."""
+    def register(self, label: str, support_images: list) -> None:
+        """Build centroid from PIL images and save to disk."""
         embeddings = np.array([self._embed(img) for img in support_images])
         centroid = embeddings.mean(axis=0, keepdims=True)
         centroid = centroid / np.linalg.norm(centroid, axis=1, keepdims=True)
         self.prototypes[label] = centroid
-        print(f"   ✅ Registered '{label}' from {len(support_images)} images.")
-        return centroid
+        self._save()
+        log.info(f"✅ Registered '{label}' ({len(support_images)} images) → saved.")
 
-    def identify(self, query_image: Image.Image, threshold: float = DEFAULT_THRESHOLD) -> tuple:
-        """Returns (best_label, similarity_score, is_matched)."""
+    def identify(self, query_image: Image.Image, threshold: float = DEFAULT_THRESHOLD):
+        """Returns (best_label, score, is_matched)."""
         if not self.prototypes:
             return None, 0.0, False
         query_feat = self._embed(query_image).reshape(1, -1)
@@ -53,5 +58,13 @@ class FewShotEngine:
                 best_label = label
         return best_label, best_score, best_score >= threshold
 
-    def registered_labels(self) -> list[str]:
-        return list(self.prototypes.keys())
+    def _save(self):
+        os.makedirs(os.path.dirname(PROTOTYPES_PATH), exist_ok=True)
+        with open(PROTOTYPES_PATH, "wb") as f:
+            pickle.dump(self.prototypes, f)
+            print("save done!")
+
+    def _load(self):
+        if os.path.exists(PROTOTYPES_PATH):
+            with open(PROTOTYPES_PATH, "rb") as f:
+                self.prototypes = pickle.load(f)

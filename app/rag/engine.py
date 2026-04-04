@@ -1,4 +1,8 @@
+import logging
 import os
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+log = logging.getLogger(__name__)
 import chromadb
 from dotenv import load_dotenv
 
@@ -18,43 +22,27 @@ Settings.embed_model = GoogleGenAIEmbedding(
     api_key=GOOGLE_API_KEY,
     embedding_config=EmbedContentConfig(output_dimensionality=768)
 )
-Settings.llm = GoogleGenAI(
-    model_name="gemini-2.5-flash",
-    api_key=GOOGLE_API_KEY
-)
+Settings.llm = GoogleGenAI(model_name="gemini-2.5-flash", api_key=GOOGLE_API_KEY)
+
 
 def get_query_engine(crop_filter: str = None):
-    """
-    Returns a query engine. 
-    If crop_filter is provided (e.g., 'Tomato'), it will strictly limit search
-    to documents tagged with that crop.
-    """
+    """Returns a LlamaIndex query engine over ChromaDB. Filters by crop if provided."""
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     chroma_db_dir = os.path.join(base_dir, "data", "chroma_db")
 
     db_client = chromadb.PersistentClient(path=chroma_db_dir)
     chroma_collection = db_client.get_or_create_collection("agronomy_manuals")
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+    index = VectorStoreIndex.from_vector_store(vector_store, embed_model=Settings.embed_model)
 
-    index = VectorStoreIndex.from_vector_store(
-        vector_store,
-        embed_model=Settings.embed_model
-    )
-
-    # Define Filters
     filters = None
     if crop_filter:
-        print(f"   ⚙️  [RAG Engine] Applying Filter: crop == {crop_filter}")
-        filters = MetadataFilters(
-            filters=[MetadataFilter(key="crop", value=crop_filter)]
-        )
+        log.info(f"⚙️  [RAG] Filter: crop == {crop_filter}")
+        filters = MetadataFilters(filters=[MetadataFilter(key="crop", value=crop_filter)])
 
-    return index.as_query_engine(
-        similarity_top_k=3,
-        filters=filters,
-    )
+    return index.as_query_engine(similarity_top_k=3, filters=filters)
+
 
 if __name__ == "__main__":
     engine = get_query_engine("Tomato")
-    response = engine.query("Treatment Early blight in Tomato")
-    print(response)
+    log.info(engine.query("Treatment Early blight in Tomato"))

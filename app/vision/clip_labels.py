@@ -40,12 +40,22 @@ CLIP_LABEL_MAP = {
     38: "Tomato leaf with Target Spot",
     39: "Tomato leaf with Tomato Yellow Leaf Curl Virus",
     40: "Tomato leaf with Tomato mosaic virus",
-    41: "Healthy Tomato leaf"
+    41: "Healthy Tomato leaf",
 }
 
 
 INSECT_LABELS = [
-    "Ladybug", "Aphid", "Whitefly", "Caterpillar", "Spider Mite", 
-    "Colorado Potato Beetle", "Japanese Beetle", "Beneficial Insect", 
-    "Ant", "Snail", "Slug", "Bee", "Wasp"
+    "Ladybug",
+    "Aphid",
+    "Whitefly", 
+    "Caterpillar", 
+    "Spider Mite", 
+    "Japanese Beetle", 
+    "Beneficial Insect", 
+    "Ant", 
+    "Snail", 
+    "Slug", 
+    "Bee", 
+    "Wasp"
+    # "Colorado Potato Beetle", 
 ]

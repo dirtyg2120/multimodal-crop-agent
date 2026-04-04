@@ -1,204 +1,195 @@
 import os
-import io
+import asyncio
 import numpy as np
-import cv2
 import streamlit as st
 import torch
-import asyncio
-# import nest_asyncio
-# nest_asyncio.apply()
+from PIL import Image
 
-from torchvision.ops import box_convert
-import groundingdino.datasets.transforms as T
 from groundingdino.util.inference import predict, load_model, annotate, load_image
 
-# --- Your Agent Code ---
-# from app.agent.deps import AgronomyDeps
-# from app.agent.core import agronomy_agent
-# from app.vision.clip_labels import CLIP_LABEL_MAP
-# import app.agent.tools
-from app.pipe import VisionSystem, analyze_full_plant
+from app.pipe import VisionSystem, analyze_full_plant, CLIP_CONFIDENCE_THRESHOLD
+from app.few_shot_engine import FewShotEngine
 
-# --- CONSTANTS & CONFIG ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-# Grounding DINO Config
-# GDINO_CONFIG = "app/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-# GDINO_WEIGHTS = "app/groundingdino/weights/groundingdino_swint_ogc.pth"
 GDINO_CONFIG = "app/groundingdino/config/GroundingDINO_SwinB_cfg.py"
 GDINO_WEIGHTS = "app/groundingdino/weights/groundingdino_swinb_cogcoor.pth"
 TEXT_PROMPT = "leaf . bug . worm ."
-BOX_THRESHOLD = 0.3
-TEXT_THRESHOLD = 0.25
 
-HF_TOKEN = os.getenv("HF_TOKEN")
 
-# --- 1. MODEL LOADING (Cached) ---
 @st.cache_resource
 def load_gdino_model():
-    """Load Grounding DINO model once."""
-    print(f"Loading Grounding DINO on {DEVICE}...")
-    model = load_model(GDINO_CONFIG, GDINO_WEIGHTS)
-    return model
+    return load_model(GDINO_CONFIG, GDINO_WEIGHTS)
 
 @st.cache_resource
-def load_clip_model():
-    """Load CLIP model once."""
+def load_vision_system():
     return VisionSystem()
 
-# --- 2. VISION HELPER FUNCTIONS ---
+@st.cache_resource
+def load_few_shot_engine():
+    return FewShotEngine()
+
+
 def extract_crops(image_source, boxes, phrases):
-    """
-    Extracts crops from the image based on Grounding DINO boxes.
-    Returns a list of dictionaries containing the crop and metadata.
-    """
-    # image_source is a generic numpy array (H, W, 3)
-    h_img, w_img, _ = image_source.shape
+    h, w, _ = image_source.shape
     crops = []
-
     for box, phrase in zip(boxes, phrases):
-        # 1. Un-normalize and convert to pixels
-        cx, cy, w, h = box.tolist()
-        x1 = int((cx - 0.5 * w) * w_img)
-        y1 = int((cy - 0.5 * h) * h_img)
-        x2 = int((cx + 0.5 * w) * w_img)
-        y2 = int((cy + 0.5 * h) * h_img)
-
-        # 2. Safety Clip
-        x1 = max(0, x1)
-        y1 = max(0, y1)
-        x2 = min(w_img, x2)
-        y2 = min(h_img, y2)
-
-        # 3. Perform Crop
-        crop_img = image_source[y1:y2, x1:x2]
-        
-        # 4. Filter tiny crops (noise)
-        if crop_img.size == 0 or (x2-x1) < 10 or (y2-y1) < 10:
-            continue
-
-        crops.append({
-            "label": phrase,
-            "crop": crop_img, # RGB Numpy Array
-            "bbox": (x1, y1, x2, y2)
-        })
+        cx, cy, bw, bh = box.tolist()
+        x1, y1 = max(0, int((cx - bw/2) * w)), max(0, int((cy - bh/2) * h))
+        x2, y2 = min(w, int((cx + bw/2) * w)), min(h, int((cy + bh/2) * h))
+        crop = image_source[y1:y2, x1:x2]
+        if crop.size > 0 and (x2-x1) >= 10 and (y2-y1) >= 10:
+            crops.append({"label": phrase, "crop": crop, "bbox": (x1, y1, x2, y2)})
     return crops
 
-# --- 3. STREAMLIT UI ---
+
+def classify_with_fewshot(vision_system, few_shot_engine, crop_np):
+    """Try CLIP first; if Unknown, check few-shot prototypes."""
+    label, conf = vision_system.classify_leaf(crop_np)
+    if label == "Unknown" and few_shot_engine.prototypes:
+        pil = Image.fromarray(crop_np)
+        fs_label, fs_score, matched = few_shot_engine.identify(pil)
+        if matched:
+            return fs_label, fs_score, True
+    return label, conf, False
+
 
 def main():
     st.set_page_config(page_title="Multimodal Crop Agent", layout="wide")
     st.title("🌾 Multimodal Crop Health Agent")
 
-    # Load Models (Cached)
-    with st.spinner("Loading AI Models..."):
-        dino_model = load_gdino_model()
-        vision_system = load_clip_model()
+    dino_model      = load_gdino_model()
+    vision_system   = load_vision_system()
+    few_shot_engine = load_few_shot_engine()
+
+    # Session state
+    if "results" not in st.session_state:
+        st.session_state.results = None
+    if "crops_data" not in st.session_state:
+        st.session_state.crops_data = None
+    if "unknown_crops" not in st.session_state:
+        st.session_state.unknown_crops = []
+
+    # Sidebar: registered prototypes
+    with st.sidebar:
+        st.header("Few-Shot Prototypes")
+        if few_shot_engine.prototypes:
+            for label in few_shot_engine.prototypes:
+                st.success(f"✅ {label}")
+        else:
+            st.caption("No prototypes registered yet.")
 
     uploaded_file = st.file_uploader("Upload Crop Image", type=["jpg", "jpeg", "png"])
+    if not uploaded_file:
+        return
 
-    if uploaded_file:
-        caption = st.text_input("Caption", value=TEXT_PROMPT, help="Text prompt for GroundingDINO")
-        col_box, col_txt = st.columns(2)
-        with col_box:
-            box_threshold = st.slider("box_threshold", 0.00, 1.00, 0.30, 0.01)
-        with col_txt:
-            text_threshold = st.slider("text_threshold", 0.00, 1.00, 0.25, 0.01)
+    col_box, col_txt = st.columns(2)
+    box_threshold = col_box.slider("box_threshold", 0.0, 1.0, 0.30, 0.01)
+    text_threshold = col_txt.slider("text_threshold", 0.0, 1.0, 0.25, 0.01)
 
-        # Save temp file because load_image expects a path
-        temp_path = "temp_uploaded_image.jpg"
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+    temp_path = "temp_uploaded_image.jpg"
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-        col1, col2 = st.columns([1, 1])
-        
-        # Display the uploaded file immediately
-        with col1:
-            st.image(uploaded_file, caption="Original Image", width="content")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.image(uploaded_file, caption="Original Image")
 
-        if st.button("Analyze Image", type="primary"):
-            
-            # --- STEP A: Grounding DINO ---
-            with st.spinner("Detecting objects..."):
-                # Use the official load_image utility
-                # image_source: original numpy array (for display/cropping)
-                # image_transformed: tensor (for model input)
-                image_source, image_transformed = load_image(temp_path)
-                
-                boxes, logits, phrases = predict(
-                    model=dino_model,
-                    image=image_transformed,
-                    caption=caption,
-                    box_threshold=box_threshold,
-                    text_threshold=text_threshold,
-                    device=DEVICE
+    # --- Analyze button: runs analysis and stores everything in session_state ---
+    if st.button("Analyze Image", type="primary"):
+        with st.spinner("Detecting objects..."):
+            image_source, image_transformed = load_image(temp_path)
+            boxes, logits, phrases = predict(
+                model=dino_model, image=image_transformed,
+                caption=TEXT_PROMPT, box_threshold=box_threshold,
+                text_threshold=text_threshold, device=DEVICE,
+            )
+            with col2:
+                st.image(annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases),
+                         caption="Detections")
+
+        crops_data = extract_crops(image_source, boxes, phrases)
+        st.success(f"Found {len(crops_data)} objects.")
+
+        unknown_crops = []
+        for item in crops_data:
+            if "leaf" in item["label"].lower():
+                label, conf, is_fs = classify_with_fewshot(vision_system, few_shot_engine, item["crop"])
+                if is_fs:
+                    st.caption(f"Few-shot matched: **{label}** ({conf:.2f})")
+                elif label == "Unknown":
+                    unknown_crops.append(item["crop"])
+
+        with st.spinner("Consulting Agronomist Agent..."):
+            results = asyncio.run(analyze_full_plant(crops_data, vision_system=vision_system))
+
+        # Store everything in session_state for display on subsequent reruns
+        st.session_state.results = results
+        st.session_state.crops_data = crops_data
+        st.session_state.unknown_crops = unknown_crops
+
+    # --- Results display: always shown if results exist in session_state ---
+    results    = st.session_state.results
+    crops_data = st.session_state.crops_data
+
+    if results:
+        agent_json = results["agent_response"]
+
+        st.divider()
+        st.subheader("📝 Agronomist Diagnosis")
+
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Overall Health", agent_json.overall_health_status)
+        k2.metric("Severity", agent_json.severity_level)
+        k3.metric("Infection Ratio", f"{agent_json.infection_ratio:.0%}")
+
+        with st.expander("Treatment Plan", expanded=True):
+            st.info(f"**Reasoning:** {agent_json.reasoning}")
+            for action in agent_json.recommended_actions:
+                st.write(f"- {action}")
+            if agent_json.required_pesticides:
+                st.warning(f"💊 Chemicals: {', '.join(agent_json.required_pesticides)}")
+
+        with st.expander("Individual Detections"):
+            for obj in results["detections"]:
+                crop_np = crops_data[obj.crop_id]["crop"]
+                c1, c2 = st.columns([1, 3])
+                c1.image(crop_np, width=120)
+                label_text = "⚠️ Unknown" if obj.label == "Unknown" else obj.label
+                c2.markdown(f"**{label_text}**")
+                c2.progress(obj.confidence, text=f"{obj.confidence:.1%}")
+
+    # --- Few-Shot Registration Panel: always shown if unknowns exist in session_state ---
+    unknown_crops = st.session_state.unknown_crops
+    if unknown_crops:
+        st.divider()
+        st.subheader("⚠️ Unknown Leaves — Teach the System")
+        st.caption(
+            f"{len(unknown_crops)} leaf(s) could not be identified by CLIP. "
+            "Label them below — the system will remember for future runs."
+        )
+
+        cols = st.columns(min(len(unknown_crops), 4))
+        for i, crop in enumerate(unknown_crops):
+            cols[i % 4].image(crop, caption=f"Unknown #{i+1}", width=130)
+
+        disease_name = st.text_input(
+            "Disease name for these leaves",
+            placeholder="e.g. Powdery Mildew, Anthracnose...",
+            key="few_shot_disease_name"
+        )
+        if st.button("Register & Save", type="primary"):
+            if not disease_name.strip():
+                st.error("Enter a disease name.")
+            else:
+                pil_crops = [Image.fromarray(c) for c in unknown_crops]
+                with st.spinner("Building prototype..."):
+                    few_shot_engine.register(disease_name.strip(), pil_crops)
+                st.session_state.unknown_crops = []
+                st.success(
+                    f"✅ **{disease_name}** registered from {len(pil_crops)} image(s). "
+                    "Next time this disease appears, it will be detected automatically."
                 )
-                
-                # Annotate and Show
-                annotated_frame = annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases)
-                with col2:
-                    st.image(annotated_frame, caption="Detections (Grounding DINO)", width="content")
 
-            # --- STEP B: Extract Crops ---
-            crops_data = extract_crops(image_source, boxes, phrases)
-            st.success(f"Found {len(crops_data)} objects.")
-
-            # --- STEP C: CLIP Verification Loop ---
-            with st.spinner("Analyzing plant health & consulting Agent..."):
-                analysis_results = asyncio.run(analyze_full_plant(
-                    crops_data, vision_system=vision_system
-                ))
-            
-            st.divider()
-            st.subheader("📝 Agronomist Diagnosis (Whole Plant)")
-            
-            # Extract data from the result dict
-            agent_json = analysis_results["agent_response"]
-
-            with st.expander("Input"):
-                st.write(analysis_results["stats"].to_dict())
-                st.write(analysis_results["detections"])
-            
-            # Create 3 columns for high-level stats
-            k1, k2, k3 = st.columns(3)
-            k1.metric("Overall Health", agent_json.overall_health_status)
-            k2.metric("Severity Level", agent_json.severity_level)
-            k3.metric("Infection Ratio", f"{agent_json.infection_ratio:.0%}")
-            
-            with st.expander("Treatment Plan", expanded=True):
-                st.info(f"**AI Reasoning:** {agent_json.reasoning}")
-
-                st.write("**Recommended Actions:**")
-                for action in agent_json.recommended_actions:
-                    st.write(f"- {action}")
-                
-                if agent_json.required_pesticides:
-                    st.warning(f"💊 **Chemicals Required:** {', '.join(agent_json.required_pesticides)}")
-
-            # 2. Show Detailed Inspection (The Loop)
-            st.divider()
-            st.subheader("🔍 Individual Leaf Inspection")
-            with st.expander("Details"):
-            
-                detections = analysis_results["detections"]
-                
-                if not detections:
-                    st.warning("No leaves detected.")
-                
-                # Use the data returned from main.py to draw the UI
-                for obj in detections:
-                    # Retrieve the original crop image using the ID
-                    original_crop = crops_data[obj.crop_id]['crop']
-                    
-                    with st.container():
-                        c1, c2, c3 = st.columns([1, 2, 2])
-                        with c1:
-                            st.image(original_crop, width=150)
-                        with c2:
-                            st.markdown(f"**{obj.label}**")
-                            st.progress(obj.confidence, text=f"Confidence: {obj.confidence:.1%}")
-
-            st.divider()
 
 if __name__ == "__main__":
     main()

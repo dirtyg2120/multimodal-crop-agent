@@ -58,7 +58,7 @@ agronomy_agent = Agent(
     model,
     deps_type=AgronomyDeps,
     output_type=DiagnosisResult,
-    retries=3,
+    retries=1, # 3
     system_prompt=(
         "You are an expert Autonomous Agronomist. "
         "You will receive an aggregate census of a plant's health. "

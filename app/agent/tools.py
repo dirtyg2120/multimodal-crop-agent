@@ -1,4 +1,8 @@
+import logging
 import os
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+log = logging.getLogger(__name__)
 import asyncio
 import nest_asyncio
 from pydantic_ai import RunContext
@@ -33,14 +37,14 @@ async def consult_ipm_manual(ctx: RunContext[AgronomyDeps], query: str) -> str:
         )
 
     enhanced_query = f"{query} in {ctx.deps.crop_name}"
-    print(f"   🔎 [RAG] Querying: '{enhanced_query}'")
+    log.info(f"🔎 [RAG] Querying: '{enhanced_query}'")
 
     try:
         response = engine.query(enhanced_query)
         response_text = str(response).strip()
 
         if not response_text or "Empty Response" in response_text:
-            print("   ⚠️ [RAG] No results found.")
+            log.info("⚠️ [RAG] No results found.")
             return (
                 "MANUAL_LOOKUP_FAILED: No relevant entries found in IPM manuals. "
                 "Use internal knowledge. You MUST state advice is based on general principles, not the manual."
@@ -49,5 +53,5 @@ async def consult_ipm_manual(ctx: RunContext[AgronomyDeps], query: str) -> str:
         return f"Verified Manual Entry:\n{response_text[:2000]}"
 
     except Exception as e:
-        print(f"   ❌ [RAG] Error: {e}")
+        log.info(f"❌ [RAG] Error: {e}")
         return "MANUAL_LOOKUP_FAILED: Retrieval error. Use internal knowledge with caution."

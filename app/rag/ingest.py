@@ -10,6 +10,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from llama_index.core import Settings
 from llama_parse import LlamaParse
+from google.genai.types import EmbedContentConfig
 
 # Load Env
 load_dotenv()
@@ -22,7 +23,8 @@ if not GOOGLE_API_KEY or not LLAMA_CLOUD_API_KEY:
 
 Settings.embed_model = GoogleGenAIEmbedding(
     model_name="gemini-embedding-001",
-    api_key=GOOGLE_API_KEY
+    api_key=GOOGLE_API_KEY,
+    embedding_config=EmbedContentConfig(output_dimensionality=768)
 )
 
 
@@ -106,6 +108,10 @@ def build_knowledge_base(target_path: str = None):
     # 4. Setup ChromaDB (Persistent Storage)
     print(f"   💾 Saving to ChromaDB at: {chroma_db_dir}")
     db_client = chromadb.PersistentClient(path=chroma_db_dir)
+    # try:
+    #     db_client.delete_collection(name="agronomy_manuals")
+    # except Exception:
+    #     pass
     chroma_collection = db_client.get_or_create_collection("agronomy_manuals")
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
