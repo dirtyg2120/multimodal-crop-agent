@@ -3,9 +3,6 @@ import torch
 import numpy as np
 from PIL import Image
 from collections import Counter
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-log = logging.getLogger(__name__)
 from transformers import CLIPModel, CLIPProcessor
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
@@ -14,6 +11,9 @@ from app.agent.core import agronomy_agent
 from app.vision.clip_labels import CLIP_LABEL_MAP, INSECT_LABELS
 from app import sample
 import app.agent.tools
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+log = logging.getLogger(__name__)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 CLIP_CONFIDENCE_THRESHOLD = 0.5  # below this → "Unknown" (open-set rejection)
@@ -46,31 +46,47 @@ class VisionSystem:
         return labels[top_idx.item()], top_prob_val
 
 
-async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
+async def analyze_full_plant(crops_data: list, vision_system: VisionSystem, few_shot_engine=None):
+    """
+    few_shot_engine: optional FewShotEngine — if provided, Unknown leaves are
+    re-checked against registered prototypes before being flagged as Unknown.
+    """
     log.info("🚜 Starting Agronomy Agent Pipeline")
 
     detected_objects = []
     disease_tally = Counter()
     pest_tally = Counter()
     healthy_count = 0
+    unknown_count = 0  # tracked separately so agent can compute ratio correctly
 
     for i, item in enumerate(crops_data):
         label_lower = item['label'].lower()
         if "leaf" in label_lower:
             full_label, conf = vision_system.classify_leaf(item['crop'])
+
+            # --- Few-shot fallback for Unknown leaves ---
+            if full_label == "Unknown" and few_shot_engine and few_shot_engine.prototypes:
+                pil = Image.fromarray(item['crop'])
+                fs_label, fs_score, matched = few_shot_engine.identify(pil)
+                if matched:
+                    full_label = fs_label
+                    conf = fs_score
+                    log.info(f"🧬 Leaf {i}: few-shot matched '{full_label}' ({conf:.2f})")
+
             if full_label == "Unknown":
-                disease_tally["Unknown disease"] += 1
+                unknown_count += 1
                 log.info(f"⚠️  Leaf {i}: low confidence ({conf:.2f}) → flagged as Unknown")
             elif "Healthy" in full_label:
                 healthy_count += 1
             else:
                 disease_name = full_label.split(" with ")[-1] if " with " in full_label else full_label
                 disease_tally[disease_name] += 1
+
             detected_objects.append(DetectedObject(label=full_label, confidence=conf, box=item['bbox'], crop_id=i))
         else:
             pest_name, conf = vision_system.classify_pest(item['crop'])
             pest_tally[pest_name] += 1
-            detected_objects.append(DetectedObject(label=f"{pest_name}", confidence=conf, box=item['bbox'], crop_id=i))
+            detected_objects.append(DetectedObject(label=pest_name, confidence=conf, box=item['bbox'], crop_id=i))
 
     # Determine dominant crop from first identified leaf
     dominant_crop = "General"
@@ -82,6 +98,9 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
             dominant_crop = obj.label.replace("Healthy ", "").replace(" leaf", "")
             break
 
+    # Total leaves only (exclude pests) for accurate infection ratio
+    total_leaves = healthy_count + sum(disease_tally.values()) + unknown_count
+
     deps = AgronomyDeps(
         user_id="user",
         crop_name=dominant_crop,
@@ -92,12 +111,17 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem):
         detailed_detections=None
     )
 
+    # Bug fix: pass unknown_count separately so agent computes infection_ratio
+    # from confirmed leaves only — not inflated by unidentified ones.
     summary_text = (
         f"Analysis Report:\n"
-        f"- Total detected objects: {deps.total_leaves}\n"
-        f"- Healthy: {deps.healthy_count}\n"
-        f"- Diseases: {deps.disease_counts}\n"
-        f"- Pests: {deps.pest_counts}\n"
+        f"- Total leaf objects detected: {total_leaves}\n"
+        f"- Healthy leaves: {healthy_count}\n"
+        f"- Diseased leaves (confirmed): {dict(disease_tally)}\n"
+        f"- Unknown condition leaves (CLIP uncertain, identity unknown): {unknown_count}\n"
+        f"- Pests detected: {dict(pest_tally)}\n"
+        f"\nIMPORTANT: Compute infection_ratio as confirmed_diseased_leaves / "
+        f"(healthy + confirmed_diseased). Do NOT count Unknown leaves as diseased.\n"
     )
 
     user_prompt = (

@@ -110,21 +110,21 @@ def main():
         crops_data = extract_crops(image_source, boxes, phrases)
         st.success(f"Found {len(crops_data)} objects.")
 
-        unknown_crops = []
-        for item in crops_data:
-            if "leaf" in item["label"].lower():
-                label, conf, is_fs = classify_with_fewshot(vision_system, few_shot_engine, item["crop"])
-                if is_fs:
-                    st.caption(f"Few-shot matched: **{label}** ({conf:.2f})")
-                elif label == "Unknown":
-                    unknown_crops.append(item["crop"])
-
         with st.spinner("Consulting Agronomist Agent..."):
-            results = asyncio.run(analyze_full_plant(crops_data, vision_system=vision_system))
+            results = asyncio.run(analyze_full_plant(
+                crops_data, vision_system=vision_system, few_shot_engine=few_shot_engine
+            ))
 
         # Store everything in session_state for display on subsequent reruns
         st.session_state.results = results
         st.session_state.crops_data = crops_data
+        # Derive unknown crops from what the pipeline actually labelled as Unknown
+        # — avoids re-running CLIP a second time
+        unknown_crops = []
+        if results:
+            for obj in results["detections"]:
+                if obj.label == "Unknown":
+                    unknown_crops.append(crops_data[obj.crop_id]["crop"])
         st.session_state.unknown_crops = unknown_crops
 
     # --- Results display: always shown if results exist in session_state ---
