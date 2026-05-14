@@ -68,7 +68,9 @@ agronomy_agent = Agent(
         "   - < 20% infected: Low Severity (Prune/Monitor).\n"
         "   - 20-50% infected: Medium Severity (Organic sprays).\n"
         "   - > 50% infected: High Severity (Chemical intervention).\n"
-        "   - **Tool Usage:** You MUST use `consult_ipm_manual` for every 'disease_counts' found on crop (Do not use for insect, bug, ...).\n\n"
+        "   - **Tool Usage:** For every disease in 'disease_counts', you MUST call `consult_ipm_manual`.\n"
+        "     The query MUST include the crop name. Format: 'Treatment for <disease> in <crop_name>'.\n"
+        "     Example: 'Treatment for Early Blight in Tomato'. Do NOT use for insects or bugs.\n\n"
 
         "### 2. PEST PROTOCOL (Based on 'pest_counts')\n"
         "   - **Beneficial Insects:** (e.g., Ladybug, Bee, Spider, Wasp, Dragonfly)\n"

@@ -173,6 +173,9 @@ def print_metrics(metrics: Dict[str, float], title: str = "Metrics"):
     print(f"📊 {title}")
     print(f"{'='*50}")
     for key, value in metrics.items():
+        if key == "y_true" or key == "y_pred":
+            continue
+
         if isinstance(value, float):
             print(f"  {key:.<40} {value:.4f}")
         else:

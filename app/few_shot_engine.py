@@ -12,7 +12,7 @@ from transformers import CLIPModel, CLIPProcessor
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_NAME = "Keetawan/clip-vit-large-patch14-plant-disease-finetuned"
-DEFAULT_THRESHOLD = 0.82
+DEFAULT_THRESHOLD = 0.76
 PROTOTYPES_PATH = "./data/few_shot_prototypes.pkl"
 
 
