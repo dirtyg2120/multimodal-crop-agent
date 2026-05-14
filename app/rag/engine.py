@@ -37,7 +37,7 @@ def get_query_engine(crop_filter: str = None):
 
     filters = None
     if crop_filter:
-        log.info(f"⚙️  [RAG] Filter: crop == {crop_filter}")
+        log.info(f"[RAG] Filter: crop == {crop_filter}")
         filters = MetadataFilters(filters=[MetadataFilter(key="crop", value=crop_filter)])
 
     return index.as_query_engine(similarity_top_k=3, filters=filters)

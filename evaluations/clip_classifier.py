@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 CONFIDENCE_THRESHOLD = 0.5
 
+from app.vision.clip_labels import DISEASE_LABELS
 
 class CLIPClassifier:
     """CLIP-based classifier with unknown rejection"""
@@ -22,7 +23,7 @@ class CLIPClassifier:
         self.known_labels = None
 
     def set_known_labels(self, labels: List[str]):
-        self.known_labels = labels
+        self.known_labels = DISEASE_LABELS
 
     def predict(self, image: Image.Image, threshold: float = CONFIDENCE_THRESHOLD) -> Tuple[str, float, bool]:
         """

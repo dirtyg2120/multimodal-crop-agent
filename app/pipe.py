@@ -8,7 +8,7 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from app.agent.deps import AgronomyDeps, DetectedObject
 from app.agent.core import agronomy_agent
-from app.vision.clip_labels import CLIP_LABEL_MAP, INSECT_LABELS
+from app.vision.clip_labels import DISEASE_LABELS, INSECT_LABELS
 from app import sample
 import app.agent.tools
 
@@ -29,7 +29,7 @@ class VisionSystem:
         log.info("✅ Models Loaded.")
 
     def classify_leaf(self, image_crop: np.ndarray):
-        return self._run_clip(image_crop, list(CLIP_LABEL_MAP.values()), self.plant_model, self.plant_processor)
+        return self._run_clip(image_crop, DISEASE_LABELS, self.plant_model, self.plant_processor)
 
     def classify_pest(self, image_crop: np.ndarray):
         return self._run_clip(image_crop, INSECT_LABELS, self.insect_model, self.insect_processor)
@@ -46,25 +46,18 @@ class VisionSystem:
         return labels[top_idx.item()], top_prob_val
 
 
-async def analyze_full_plant(crops_data: list, vision_system: VisionSystem, few_shot_engine=None):
+def classify_crops(crops_data: list, vision_system: VisionSystem, few_shot_engine=None) -> list:
     """
-    few_shot_engine: optional FewShotEngine — if provided, Unknown leaves are
-    re-checked against registered prototypes before being flagged as Unknown.
+    CLIP classification pass only — no agent.
+    Returns a list of DetectedObject so the caller can display results immediately
+    before the (slow) agent runs.
     """
-    log.info("🚜 Starting Agronomy Agent Pipeline")
-
     detected_objects = []
-    disease_tally = Counter()
-    pest_tally = Counter()
-    healthy_count = 0
-    unknown_count = 0  # tracked separately so agent can compute ratio correctly
-
     for i, item in enumerate(crops_data):
         label_lower = item['label'].lower()
         if "leaf" in label_lower:
             full_label, conf = vision_system.classify_leaf(item['crop'])
 
-            # --- Few-shot fallback for Unknown leaves ---
             if full_label == "Unknown" and few_shot_engine and few_shot_engine.prototypes:
                 pil = Image.fromarray(item['crop'])
                 fs_label, fs_score, matched = few_shot_engine.identify(pil)
@@ -74,21 +67,50 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem, few_
                     log.info(f"🧬 Leaf {i}: few-shot matched '{full_label}' ({conf:.2f})")
 
             if full_label == "Unknown":
-                unknown_count += 1
                 log.info(f"⚠️  Leaf {i}: low confidence ({conf:.2f}) → flagged as Unknown")
-            elif "Healthy" in full_label:
-                healthy_count += 1
-            else:
-                disease_name = full_label.split(" with ")[-1] if " with " in full_label else full_label
-                disease_tally[disease_name] += 1
 
             detected_objects.append(DetectedObject(label=full_label, confidence=conf, box=item['bbox'], crop_id=i))
         else:
             pest_name, conf = vision_system.classify_pest(item['crop'])
-            pest_tally[pest_name] += 1
             detected_objects.append(DetectedObject(label=pest_name, confidence=conf, box=item['bbox'], crop_id=i))
 
-    # Determine dominant crop from first identified leaf
+    return detected_objects
+
+
+async def analyze_full_plant(
+    crops_data: list,
+    vision_system: VisionSystem,
+    few_shot_engine=None,
+    detections: list = None,   # pass pre-computed to skip re-running CLIP
+):
+    """
+    If `detections` is provided (from a prior classify_crops() call), skips
+    the CLIP loop and goes straight to agent reasoning.
+    """
+    log.info("🚜 Starting Agronomy Agent Pipeline")
+
+    if detections is None:
+        detections = classify_crops(crops_data, vision_system, few_shot_engine)
+
+    detected_objects = detections
+    disease_tally = Counter()
+    pest_tally = Counter()
+    healthy_count = 0
+    unknown_count = 0
+
+    for obj in detected_objects:
+        label = obj.label
+        if any(kw in crops_data[obj.crop_id]['label'].lower() for kw in ('leaf',)):
+            if label == "Unknown":
+                unknown_count += 1
+            elif "Healthy" in label:
+                healthy_count += 1
+            else:
+                disease_name = label.split(" with ")[-1] if " with " in label else label
+                disease_tally[disease_name] += 1
+        else:
+            pest_tally[label] += 1
+
     dominant_crop = "General"
     for obj in detected_objects:
         if " leaf " in obj.label:
@@ -98,7 +120,6 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem, few_
             dominant_crop = obj.label.replace("Healthy ", "").replace(" leaf", "")
             break
 
-    # Total leaves only (exclude pests) for accurate infection ratio
     total_leaves = healthy_count + sum(disease_tally.values()) + unknown_count
 
     deps = AgronomyDeps(
@@ -111,8 +132,6 @@ async def analyze_full_plant(crops_data: list, vision_system: VisionSystem, few_
         detailed_detections=None
     )
 
-    # Bug fix: pass unknown_count separately so agent computes infection_ratio
-    # from confirmed leaves only — not inflated by unidentified ones.
     summary_text = (
         f"Analysis Report:\n"
         f"- Total leaf objects detected: {total_leaves}\n"

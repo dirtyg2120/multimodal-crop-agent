@@ -11,23 +11,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+from app.vision.clip_labels import RESNET_TO_CLIP
+
 
 def resnet_to_clip_label(resnet_label: str) -> str:
-    """Convert ResNet label format to CLIP format.
-
-    ResNet: "Tomato Early blight"
-    CLIP:   "Tomato leaf with Early blight"
-    """
-    parts = resnet_label.split(" ", 1)
-    if len(parts) < 2:
-        return resnet_label
-
-    crop, disease = parts[0], parts[1]
-
-    if disease.lower() == "healthy":
-        return f"Healthy {crop} leaf"
-    else:
-        return f"{crop} leaf with {disease}"
+    return RESNET_TO_CLIP.get(resnet_label, f"[UNMAPPED] {resnet_label}")
 
 
 class ResNetClassifier:
@@ -42,11 +30,9 @@ class ResNetClassifier:
         self.known_labels = None
 
     def set_known_labels(self, labels: List[str]):
-        # ResNet doesn't use known_labels for inference (predicts from its 38 classes),
-        # stored only for API consistency with CLIPClassifier
         self.known_labels = labels
 
-    def predict(self, image: Image.Image, threshold: float = 0.5) -> Tuple[str, float, bool]:
+    def predict(self, image: Image.Image, threshold: float = 0.35) -> Tuple[str, float, bool]:
         inputs = self.feature_extractor(images=np.array(image), return_tensors="pt").to(DEVICE)
 
         with torch.no_grad():
@@ -63,5 +49,5 @@ class ResNetClassifier:
         # ResNet rarely rejects unknowns - it always picks from its 38 classes
         if top_prob < threshold:
             return "Unknown", top_prob, True
-        else:
-            return clip_label, top_prob, False
+        
+        return clip_label, top_prob, False
