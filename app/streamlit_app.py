@@ -18,7 +18,7 @@ TEXT_PROMPT = "leaf . bug . worm ."
 
 @st.cache_resource
 def load_gdino_model():
-    return load_model(GDINO_CONFIG, GDINO_WEIGHTS)
+    return load_model(GDINO_CONFIG, GDINO_WEIGHTS, device=DEVICE)
 
 @st.cache_resource
 def load_vision_system():

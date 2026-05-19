@@ -8,7 +8,7 @@ import nest_asyncio
 from pydantic_ai import RunContext
 from app.agent.deps import AgronomyDeps
 from app.agent.core import agronomy_agent
-from app.rag.engine import get_query_engine
+from app.rag.engine import retrieve_chunks
 
 try:
     import uvloop
@@ -29,28 +29,20 @@ async def consult_ipm_manual(ctx: RunContext[AgronomyDeps], query: str) -> str:
             "Use internal knowledge only. Do NOT reference any manual."
         )
 
-    engine = get_query_engine(crop_filter=ctx.deps.crop_name)
-    if engine is None:
-        return (
-            "MANUAL_LOOKUP_FAILED: Retrieval engine is offline. "
-            "Use internal knowledge and state the manual was inaccessible."
-        )
-
-    enhanced_query = f"{query} in {ctx.deps.crop_name}"
-    log.info(f"🔎 [RAG] Querying: '{enhanced_query}'")
+    log.info(f"[RAG] Filter: crop == {ctx.deps.crop_name}")
+    log.info(f"🔎 [RAG] Querying: '{query}'")
 
     try:
-        response = engine.query(enhanced_query)
-        response_text = str(response).strip()
+        passages = retrieve_chunks(query, crop_filter=ctx.deps.crop_name)
 
-        if not response_text or "Empty Response" in response_text:
+        if not passages:
             log.info("⚠️ [RAG] No results found.")
             return (
                 "MANUAL_LOOKUP_FAILED: No relevant entries found in IPM manuals. "
                 "Use internal knowledge. You MUST state advice is based on general principles, not the manual."
             )
 
-        return f"Verified Manual Entry:\n{response_text[:2000]}"
+        return f"Verified Manual Passages:\n{passages[:3000]}"
 
     except Exception as e:
         log.info(f"❌ [RAG] Error: {e}")
