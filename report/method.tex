@@ -99,7 +99,7 @@ The RAG system relies on a curated library of agricultural information. This ens
 
 \begin{itemize}
 	\item \textbf{Data Collection:} The knowledge base includes data on symptoms, causes, and treatments for various crops, with a specific focus on the Tomato varieties found in the PlantVillage dataset.
-	\item \textbf{Chunking and Embedding:} Large expert documents are divided into smaller, manageable text segments. These segments are converted into numerical vectors using an embedding model, which represents the semantic meaning of the agricultural advice.
+	\item \textbf{Chunking and Embedding:} Large expert documents are divided into smaller, manageable text segments. These segments are converted into 768-dimensional numerical vectors using Google's \texttt{gemini-embedding-001} model, which represents the semantic meaning of the agricultural advice.
 \end{itemize}
 
 \subsection{Semantic Search and Indexing (ChromaDB)}
@@ -107,7 +107,7 @@ To retrieve the correct information during the diagnostic loop, the agent uses \
 
 \begin{itemize}
 	\item \textbf{Vector Storage:} All embedded knowledge chunks are indexed within ChromaDB. This allows for high-speed searching during the "Reason" stage of the agentic loop.
-	\item \textbf{Similarity Search:} When the CLIP model identifies a condition (e.g., \textit{``Tomato Late Blight''}), the agent generates a query vector. ChromaDB then performs a similarity search to find the most relevant treatment protocols.
+	\item \textbf{Similarity Search:} When the CLIP model identifies a condition (e.g., \textit{``Tomato Late Blight''}), the agent generates a query vector. ChromaDB then performs a similarity search to find the top-3 most relevant treatment protocol passages.
 	\item \textbf{Contextual Filtering:} The search is restricted based on the current context (such as the plant species). This ensures that the retrieved information is specific to the user's current problem and ignores irrelevant data.
 \end{itemize}
 

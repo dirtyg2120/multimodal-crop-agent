@@ -282,19 +282,19 @@ self-correction.
 
 \section{Contributions}
 
-In this thesis, we developed an autonomous multimodal agent for diagnosing crop diseases, resolving the semantic gap between simple visual detection and providing actionable farming advice. We also take open-set perception and agent self-correction into account, which pushes beyond the limitations of traditional fixed-class AI systems in agriculture. We evaluated the pipeline extensively and achieved promising results. 
+In this thesis, I developed an autonomous multimodal agent for diagnosing crop diseases, resolving the semantic gap between simple visual detection and providing actionable farming advice. I also take open-set perception and agent self-correction into account, which pushes beyond the limitations of traditional fixed-class AI systems in agriculture. I evaluated the pipeline extensively and achieved promising results. 
 
-Compared to standard closed-set models, our system safely handles unknown crops by using a data-driven confidence threshold ($\tau^* = 0.85$, Section~\ref{sec:exp2}) and registers new diseases via a few-shot engine ($\tau = 0.76$, Section~\ref{sec:exp3}). Additionally, thanks to the self-correcting agent and crop-filtered ChromaDB retrieval layer, the system can dynamically enforce treatment safety rules (like avoiding pesticide conflicts) and eliminate LLM hallucinations. Thus, we believe this framework provides a strong trade-off between open-world flexibility and expert-level safety.
+Compared to standard closed-set models, my system safely handles unknown crops by using a data-driven confidence threshold ($\tau^* = 0.85$, Section~\ref{sec:exp2}) and registers new diseases via a few-shot engine ($\tau = 0.76$, Section~\ref{sec:exp3}). Additionally, thanks to the self-correcting agent and crop-filtered ChromaDB retrieval layer, the system can dynamically enforce treatment safety rules (like avoiding pesticide conflicts) and eliminate LLM hallucinations. Thus, I believe this framework provides a strong trade-off between open-world flexibility and expert-level safety.
 
-In conclusion, we hope that our contribution to multimodal agent architectures will inspire future research in building safe and reasoning-capable AI systems for agriculture.
+In conclusion, I hope that my contribution to multimodal agent architectures will inspire future research in building safe and reasoning-capable AI systems for agriculture.
 
 \section{Future Work}
 
 \paragraph{Improving Vision Foundation Models}
-Despite the promising results of open-set vision, the ongoing false rejection rate ($\geq$13\% at $\tau=0.30$) and the few-shot false positive rate (73.2\% at $\tau=0.76$) suggest room for improvement. Our future direction consists of incorporating specific negative examples, contrastive learning methods, or a simple classification layer on top of the frozen CLIP model to better scale to new crops. 
+Despite the promising results of open-set vision, the ongoing false rejection rate ($\geq$13\% at $\tau=0.30$) and the few-shot false positive rate (73.2\% at $\tau=0.76$) suggest room for improvement. My future direction consists of incorporating specific negative examples, contrastive learning methods, or a simple classification layer on top of the frozen CLIP model to better scale to new crops. 
 
 \paragraph{Benchmarking the Vision Pipeline Against State-of-the-Art Models}
-While our current pipeline establishes a strong foundation, future research should focus on constructing a benchmark for the core vision components (Grounding DINO and CLIP) against other State-of-the-Art (SOTA) models. Because evaluating the entire reasoning agent is complex, comparing the vision pipeline's localization and classification performance on unstructured field datasets will help quantify the specific advantages of our open-set perception approach.
+While my current pipeline establishes a strong foundation, future research should focus on constructing a benchmark for the core vision components (Grounding DINO and CLIP) against other State-of-the-Art (SOTA) models. Because evaluating the entire reasoning agent is complex, comparing the vision pipeline's localization and classification performance on unstructured field datasets will help quantify the specific advantages of my open-set perception approach.
 
 \paragraph{Expanded Coverage and Expert Validation}
 The current CLIP label set primarily covers Tomato and Grape diseases. Expanding this to include a wider variety of crops and ingesting more diverse RAG documents would greatly increase the system's practical usefulness. Ultimately, testing with professional agronomists would confirm the value of the structured output and uncertainty warnings in real decision-making contexts.

@@ -23,7 +23,7 @@ Furthermore, the integration of Large Language Models (LLMs) has given rise to \
 
 \section{Problem Definitions}
 
-To properly contextualize the challenges in autonomous crop health management, we formally define the technical limitations inherent in traditional supervised learning and generation tasks. These definitions establish the necessity for the open-set and retrieval-augmented architecture proposed in this thesis.
+To properly contextualize the challenges in autonomous crop health management, I formally define the technical limitations inherent in traditional supervised learning and generation tasks. These definitions establish the necessity for the open-set and retrieval-augmented architecture proposed in this thesis.
 
 \subsection{The Open-Set Recognition Problem}
 Standard object detection systems operate under a ``Closed-Set'' assumption. In this paradigm, a model is trained on a dataset $D_{train} = \{(x_i, y_i)\}_{i=1}^N$, where $x_i$ is an input image and $y_i$ belongs to a fixed set of predefined classes $C_{train} = \{c_1, c_2, \dots, c_k\}$. The detection function $f$ is optimized to map an input to one of these known classes:
@@ -34,7 +34,7 @@ The fundamental problem arises during deployment when the system encounters a no
 \textbf{Open-Set Recognition}, therefore, requires a model capable of zero-shot transfer. This is defined as learning a function $f(x, t) \rightarrow \hat{y}$, where $t$ is a natural language description, allowing the identification of classes where $C_{test} \not\subseteq C_{train}$.
 
 \subsection{The Semantic Gap and Hallucination}
-While visual detectors identify spatial features (e.g., bounding boxes), they lack the capacity to reason about causal implications. Conversely, Large Language Models (LLMs) possess general reasoning capabilities but lack visual grounding. We define the \textbf{Semantic Gap} as the disconnect between the visual feature representation $V$ (e.g., pixel patterns of a yellow leaf) and the domain-specific knowledge $K$ required to diagnose the cause (e.g., distinguishing between nitrogen deficiency and early blight).
+While visual detectors identify spatial features (e.g., bounding boxes), they lack the capacity to reason about causal implications. Conversely, Large Language Models (LLMs) possess general reasoning capabilities but lack visual grounding. I define the \textbf{Semantic Gap} as the disconnect between the visual feature representation $V$ (e.g., pixel patterns of a yellow leaf) and the domain-specific knowledge $K$ required to diagnose the cause (e.g., distinguishing between nitrogen deficiency and early blight).
 
 Relying solely on generative models to bridge this gap introduces the problem of \textbf{Hallucination}. Given a user query $Q$ and a visual context $I$, a standard LLM generates a response $\hat{y}$ by maximizing the probability of the next token based on training correlations rather than factual correctness:
 \[ \hat{y} = \arg\max_y P(y | I, Q) \]
