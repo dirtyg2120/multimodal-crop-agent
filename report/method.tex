@@ -1,10 +1,10 @@
 \chapter{Methodology}
 \label{chap:method}
 \thispagestyle{open}
-\section{Conceptual Agent Architecture}
+\section{Conceptual Architecture}
 \begin{figure}[h]
 	\centering
-	\includegraphics[width=\textwidth]{images/agent_arch.png}
+	\includegraphics[width=\textwidth]{images/agent_arch_lr.pdf}
 	\caption{Conceptual Agent Architecture}
 	\label{fig:agent_arch}
 \end{figure}
@@ -12,14 +12,14 @@
 The diagram \ref{fig:agent_arch} illustrates the logical flow and the decoupling of the vision, knowledge, and orchestration layers. The agent operates in a four-stage cycle that separates finding an object from identifying its condition:
 \begin{enumerate}
 	\item \textbf{Observe (Localization):} The agent uses Grounding DINO\cite{liu2023grounding} to scan the image for general agricultural objects. It uses simple prompts like ``leaf'', ``bug'', or ``worm''. The goal here is just to find the location and create a bounding box around the object.
-	\item \textbf{Verify (Fine-Grained Classification):} Once a box is found, the agent crops that image and sends it to the fine-tuned CLIP model. This model checks for specific diseases or pests, such as ``Durian leaf with Algal Leaf Spot'' or ``Grasshopper''. This acts as a verification layer to ensure the diagnosis is precise.
+	\item \textbf{Verify (Fine-Grained Classification):} Once a box is found, the agent crops that image and sends it to the fine-tuned CLIP model. This model predicts specific diseases or pests. If the model's confidence score falls below a strict threshold (e.g., 0.5), the detection is flagged as ``Unknown'' and routed to a Few-Shot Engine. This engine compares the image against previously registered prototypes using cosine similarity, allowing the system to identify novel anomalies dynamically without retraining.
 	\item \textbf{Reason (Knowledge Retrieval):} After the disease or pest is identified, the agent queries the RAG system. It retrieves expert advice from the database about that specific condition.
 	\item \textbf{Act (Response Generation):} The agent combines the visual findings and the retrieved expert knowledge to create a final report. 
 \end{enumerate}
 
 \textbf{State Management} 
 
-To make the agent understand the whole context, it needs to remember its progress. during a diagnostic session. I implemented a state management process that included these functions:
+To make the agent understand the whole context, it needs to remember its progress during a diagnostic session. I implemented a state management process that included these functions:
 \begin{itemize}
 	\item Tracking Objects: The agent keeps track of every leaf or bug it has already checked. This prevents it from wasting time analyzing the same spot twice.
 	\item Handling Unclear Results: If the CLIP model is not sure about a disease (low similarity score), the agent’s memory records this uncertainty. It then uses the Reasoning stage to look for ``look-alike'' symptoms in the knowledge base instead of just guessing.
@@ -55,6 +55,14 @@ After the objects are found, the agent must check their health or identify the s
 	\item \textbf{Checking Pests (Bug Identification):} If the object is a bug or a worm, it is sent to the standard CLIP model (\texttt{openai/clip-vit-base-patch16}). This version is better at general identification and helps identify insects like a \textit{``Ladybug''} or \textit{``Grasshopper''} without getting confused by leaf features.
 \end{itemize}
 
+\subsubsection{Graceful Degradation via Few-Shot Engine}
+A major limitation of fixed-class classification is overconfident misclassification of novel diseases. To address this and ensure graceful degradation, the verification layer incorporates an open-set rejection and Few-Shot Learning (FSL) fallback mechanism.
+
+\textbf{Open-Set Rejection:} When the fine-tuned CLIP model evaluates a crop image, it outputs a softmax probability distribution over the known classes. If the maximum probability (confidence score) falls below a predefined threshold (e.g., $\tau_{reject} = 0.35$), the system explicitly rejects the prediction and flags the detection as ``Unknown''. This prevents the reasoning agent from receiving hallucinations or incorrect visual premises.
+
+\textbf{Few-Shot Prototype Matching:} To dynamically handle these unknown samples without retraining the core CLIP model, the system maintains a lightweight database of novel disease prototypes stored locally (e.g., via serialized \texttt{.pkl} files). Each prototype represents the centroid (mean embedding) of a registered novel class. When an image is flagged as Unknown, the engine extracts its frozen CLIP embedding and computes the cosine similarity against all stored prototypes. 
+
+\textbf{Registration and Classification:} If the highest similarity score exceeds a strict threshold (e.g., $\tau_{sim} = 0.82$), the image is assigned the label of the matched prototype. If it fails to match any existing prototype, the system retains the ``Unknown'' status, triggering the reasoning layer's fallback protocol. When an agronomist later identifies the new disease, the engine registers a new prototype by averaging the embeddings of the new support images, allowing the system to autonomously recognize the pathogen in future iterations.
 
 
 \subsection{Comparative Analysis of Perception Stages}
@@ -124,29 +132,32 @@ The agent uses a routing mechanism to control the execution of tasks. This allow
 	\item Result Synthesis: The orchestration layer combines the visual evidence from CLIP with the textual advices from ChromaDB to generate a single, structured report for the end-user.
 \end{itemize}
 
-%4.4.1 Pydantic AI Implementation: Defining the State Schema and Type-Safe JSON outputs.
-%
-%4.4.2 Decision Logic: Routing rules (e.g., differentiating "Benign Bug" from "Pest").
+\subsection{Domain-Specific Self-Correction}
+While Large Language Models are capable of reasoning, they can generate illogical or unsafe advice if left unconstrained. To address this, the orchestration layer implements three strict agricultural validation rules. If the agent's generated output violates any of these rules, the system forces the LLM to re-evaluate its logic (up to 3 times) before presenting the result to the user:
+
+\begin{itemize}
+    \item \textbf{Action Completeness (\texttt{empty\_actions}):} The agent must provide a concrete action plan; it cannot output an empty recommendation.
+    \item \textbf{Severity-Treatment Alignment (\texttt{high\_severity\_no\_pesticide}):} If the agent assesses a disease as ``High Severity'', the system rejects any output that fails to include a chemical intervention.
+    \item \textbf{Visual-Logic Consistency (\texttt{ratio\_severity\_mismatch}):} If the vision pipeline detects that the disease ratio exceeds 40\% of the leaf area, the system will reject any reasoning that classifies the severity as ``Low''.
+\end{itemize}
+By encoding these domain constraints directly into the validation layer, the system guarantees a baseline of agronomic safety that standard LLMs cannot provide.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Data Strategy}
+This section describes the datasets used to develop and validate the proposed agentic framework. Because the system is designed to bridge the gap between controlled laboratory settings and unstructured real-world fields, two distinct datasets are utilized for evaluation.
 
-%\section{Data Strategy}
-%This section describes the data used to develop and validate the proposed agentic framework.
-%
-%\subsection{Primary Dataset: PlantVillage}
-%The core of the evaluation uses the \textbf{PlantVillage} dataset. This dataset is a widely recognized benchmark in digital agriculture, containing thousands of images of healthy and diseased plant leaves.
-%
-%\begin{itemize}
-%	\item \textbf{Crop Scope:} For the purposes of this thesis, the focus is placed on \textbf{Tomato} crops. This choice is due to the high variety of diseases available in the dataset, which provides a challenging environment for the verification layer.
-%	\item \textbf{Usage in the Loop:} These images are used to test the transition between the \textit{Observe} stage (detecting the leaf) and the \textit{Verify} stage (identifying the specific pathology using the fine-tuned CLIP model).
-%\end{itemize}
-%
-%\subsection{Open-Set and Pest Validation}
-%To test the agent's ability to detect more than just leaves, additional data is used.
-%\begin{itemize}
-%	\item \textbf{General Pests:} Images of common agricultural pests, such as beetles and worms, are used to validate the \textbf{base CLIP} model's ability to identify insects without being biased toward leaf features.
-%	\item \textbf{Open-Set Robustness:} The agent is tested with images containing non-agricultural objects to ensure Grounding DINO correctly filters out irrelevant data.
-%\end{itemize}
-%
-%\subsection{Evaluation Metrics}
-%The success of the data strategy is measured by the agent's ability to correctly link a visual symptom to a specific treatment recommendation. Metrics include detection precision for Grounding DINO and classification accuracy for the dual-CLIP verification process.
+\subsection{Closed-Set and Open-Set Baseline: PlantVillage}
+The core quantitative evaluation uses the \textbf{PlantVillage} dataset \cite{DBLP:journals/corr/HughesS15}. This dataset is a widely recognized benchmark in digital agriculture, containing over 50,000 images of healthy and diseased plant leaves captured under controlled laboratory conditions with homogeneous backgrounds.
+
+\begin{itemize}
+	\item \textbf{Known Classes (In-Distribution):} To evaluate the classification baseline, the system focuses on the 10 Tomato disease categories present in PlantVillage.
+	\item \textbf{Unknown Classes (Out-of-Distribution):} To test the open-set rejection and few-shot capabilities of the verification layer, morphologically distinct crops from the dataset (such as Squash, Peach, and Blueberry) are deliberately introduced as ``unknown'' anomalies.
+\end{itemize}
+
+\subsection{Real-World Robustness: PlantDoc}
+While PlantVillage is excellent for measuring pure classification accuracy, it does not reflect the complexity of actual farming environments. To evaluate the pipeline's robustness in the wild, the \textbf{PlantDoc} dataset \cite{DBLP:journals/corr/abs-1911-10317} is employed. 
+
+\begin{itemize}
+	\item \textbf{Characteristics:} PlantDoc consists of real-world images crawled from the internet, featuring complex backgrounds, multiple overlapping leaves, varying lighting conditions, and unstructured noise.
+	\item \textbf{Usage in the Loop:} This dataset is specifically used to evaluate the end-to-end ``Observe-Verify'' pipeline. It tests Grounding DINO's ability to accurately localize leaves and pests in chaotic environments before passing them to the CLIP verifier.
+\end{itemize}

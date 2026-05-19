@@ -194,7 +194,7 @@ breaklinks=true,
 	
 	In any case of plagiarism, we stand by our actions and will be responsible for it. Ho Chi Minh City University of Technology therefore are not responsible for any copyright infringements conducted within our research. \\[20pt]
 	\begin{flushright}
-		Ho Chi Minh City, December 2025 \\
+		Ho Chi Minh City, May 2026 \\
 		Authors \\
 		Tran Quoc Anh \\
 	\end{flushright}
@@ -209,9 +209,9 @@ breaklinks=true,
 	\chapter*{\centering{Abstract}}
 	Agriculture faces growing threats from diseases and climate change, making autonomous health management systems essential. Most current Artificial Intelligence systems rely on ``closed-set'' detectors that map inputs to a fixed list of known classes. These models often fail in real field conditions and cannot identify new pests without constant retraining. Additionally, there is a ``Semantic Gap'' between simply detecting a symptom and providing actual farming advice.
 	
-	This thesis proposes an Autonomous Multimodal Agronomy Agent designed to bridge these gaps by unifying open-set perception with expert-level reasoning. The proposed architecture functions through a structured ``Observe $\rightarrow$ Verify $\rightarrow$ Reason  $\rightarrow$ Act'' loop. First, the system utilizes Grounding DINO\cite{liu2023grounding} to perform open-set object detection, enabling the identification of pests and diseases-ranging from general-purpose anomalies to specific Vietnamese crops on arbitrary natural language descriptions rather than predefined labels. Second, a fine-tuned CLIP\cite{radford2021learning} (Contrastive Language-Image Pre-training) model filters out false positives by matching visual data with scientific descriptions in a shared embedding space. Finally, an Agentic Retrieval-Augmented Generation (RAG) engine links these findings to a database of agricultural literature. This ensures that the final reports for farmers are fact-based and free from model hallucinations.
+	This thesis proposes an Autonomous Multimodal Agronomy Agent designed to bridge these gaps by unifying open-set perception with expert-level reasoning. The proposed architecture functions through a structured ``Observe $\rightarrow$ Verify $\rightarrow$ Reason  $\rightarrow$ Act'' loop. First, the system utilizes Grounding DINO\cite{liu2023grounding} to find leaves and insects. Second, a fine-tuned CLIP\cite{radford2021learning} (Contrastive Language-Image Pre-training) model classifies diseases and rejects unknown inputs using a threshold, while a few-shot engine helps identify new diseases without retraining. Finally, an Agentic Retrieval-Augmented Generation (RAG) engine links these findings to a database of agricultural books. This agent also checks its own logic using specific rules to make sure the final reports for farmers are safe, fact-based, and free from model hallucinations.
 	
-	While these individual technologies are powerful, this work focuses on integrating them into a unified workflow capable of handling complex, whole-plant imagery. By moving beyond simple leaf classification, this framework offers a scalable way to deliver expert-level recommendations directly to agricultural practitioners.
+	While these individual technologies are powerful, this work focuses on integrating them into a unified workflow capable of handling complex, whole-plant imagery. By moving beyond simple leaf classification, this framework offers a way to deliver reliable, expert-level recommendations directly to farmers.
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	\tableofcontents

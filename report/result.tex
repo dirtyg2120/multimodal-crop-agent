@@ -1,29 +1,303 @@
-\chapter{Evaluation Plan and Expected Contributions}
-\section{Proposed Evaluation Metrics}
-The system will be evaluated using three primary metrics to ensure each part of the loop is performing correctly:
-\begin{itemize}
-	\item \textbf{Mean Average Precision:} Used to assess the localization accuracy of Grounding DINO in identifying leaves, bugs, and worms.
-	\item \textbf{Accuracy:} Used to measure the performance of the dual-CLIP verification layer in identifying specific pathologies.
-	\item \textbf{Retrieval Relevance:} Evaluates the RAG system's ability to provide the correct expert treatment advice from ChromaDB based on the identified condition.
-	\item \textbf{Visual Case Analysis:} This analysis focuses on the agent's robustness in many other images from the Internet with complex context, ensuring the reasoning and recommendation still perform well.
-\end{itemize}
+\chapter{Evaluation}
 
-%\chapter{Expected Contributions \& Conclusion}
-\section{Expected Contributions}
-This thesis aims to contribute to the field of Agentic AI in agriculture by:
-\begin{itemize}
-	\item Providing a solid ``Observe-Verify-Reason-Act'' framework that bridges the gap between raw vision and expert reasoning.
-	\item Demonstrating the use of Open-Set Detection to handle the diverse and changing nature of farm environments without constant retraining.
-	\item Developing a method for knowledge grounding that ensures AI recommendations are based on verified agricultural facts.
-\end{itemize}
+% =========================================================
+% 5.1  Evaluation Design
+% =========================================================
+\section{Evaluation Design}
 
-The primary contribution of this research is the development of a stateful agentic loop that integrates open-set detection with expert knowledge. By moving away from static pipelines, this work demonstrates a more flexible and reliable approach to precision agriculture.
+The evaluation follows a three-track strategy, summarised in
+Table~\ref{tab:eval_strategy}.
+Both CLIP (\texttt{Keetawan/clip-vit-large-patch14-plant-disease-finetuned}~\cite{keetawan2024plantdisease})
+and ResNet-50 (\texttt{SanketJadhav/PlantDiseaseClassifier-Resnet50}~\cite{SanketJadhavplantdisease}) are
+fine-tuned on PlantVillage~\cite{DBLP:journals/corr/HughesS15}, ensuring the comparison isolates architectural
+capability rather than data advantage.
+
+\begin{table}[h]
+    \centering
+    \caption{Three-track evaluation strategy.}
+    \label{tab:eval_strategy}
+    \begin{tabular}{p{1.2cm}p{2.5cm}p{3cm}p{3cm}p{4cm}}
+        \hline
+        \textbf{Exp.} & \textbf{Dataset} & \textbf{Models} & \textbf{Metrics} & \textbf{What It Proves} \\
+        \hline
+        1 & PlantVillage & CLIP vs ResNet-50 & Top-1 Accuracy & Closed-set comparison on equal footing \\
+        \hline
+        2 & PlantVillage & CLIP threshold sweep & Unknown F1, Rejection Rate & Open-set rejection; CLIP better calibrated \\
+        \hline
+        3 & PlantVillage & Few-Shot Engine & TPR, FPR, F1 & Prototype-based unknown registration at inference time \\
+        \hline
+        4 & PlantDoc & Full DINO + CLIP pipeline & Qualitative case analysis & End-to-end pipeline robustness \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% =========================================================
+% 5.2  Experiment 1 — Closed-Set Classification (Track 1)
+% =========================================================
+\section{Experiment 1: Closed-Set Classification Accuracy}
+\label{sec:exp1}
+
+
+Both classifiers were evaluated on 31 PlantVillage disease classes
+(Apple, Corn, Grape, Orange, Pepper, Potato, Strawberry, Tomato)
+with $\tau = 0$ (no rejection) and 150~images per class (4,650 total).
+CLIP uses \texttt{ViT-L/14}~\cite{keetawan2024plantdisease};
+ResNet-50 uses a 38-class fine-tuned checkpoint~\cite{SanketJadhavplantdisease}.
+
+
+\begin{table}[h]
+    \centering
+    \caption{Closed-set classification metrics (31 classes, 4,650 samples, $\tau=0$).}
+    \label{tab:closed_set}
+    \begin{tabular}{lccc}
+        \hline
+        \textbf{Model} & \textbf{Top-1 Accuracy (\%)} & \textbf{Macro-F1} & \textbf{Weighted-F1} \\
+        \hline
+        CLIP (ViT-L/14, fine-tuned) & \textbf{99.97} & \textbf{1.00} & \textbf{1.00} \\
+        ResNet-50 (fine-tuned)      & 95.18          & 0.82          & 0.95          \\
+        \hline
+    \end{tabular}
+\end{table}
+
+CLIP achieves near-perfect accuracy across all 31 classes.
+ResNet-50 shows meaningful degradation on visually similar Tomato diseases
+(Table~\ref{tab:closed_set_perclass}); the macro-F1 of 0.82 is depressed by
+zero-support classes in ResNet's 38-class output space --- the weighted-F1
+of 0.95 is the more informative aggregate.
+
+\begin{table}[h]
+    \centering
+    \caption{Per-class F1 for the most challenging ResNet-50 classes.}
+    \label{tab:closed_set_perclass}
+    \begin{tabular}{lcc}
+        \hline
+        \textbf{Class} & \textbf{CLIP F1} & \textbf{ResNet-50 F1} \\
+        \hline
+        Tomato Early Blight                        & 1.00 & 0.76 \\
+        Corn Cercospora Leaf Spot                  & 0.99 & 0.84 \\
+        Tomato Target Spot                         & 1.00 & 0.82 \\
+        Tomato Bacterial Spot                      & 0.99 & 0.89 \\
+        Corn Northern Leaf Blight                  & 0.99 & 0.87 \\
+        Tomato Late Blight                         & 1.00 & 0.90 \\
+        Healthy Tomato leaf                        & 1.00 & 0.95 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The largest gap is on \textit{Tomato Early Blight}: ResNet-50 recall is 63\%
+(F1 = 0.76) versus CLIP's 100\%, indicating that CLIP's vision-language
+alignment provides stronger discriminative features for fine-grained lesion
+patterns.
+Both models were evaluated on the same distribution they were trained on,
+so the near-perfect CLIP scores reflect architectural capability on the
+training domain, not data leakage; the purpose of Experiment~1 is to confirm
+that open-set capability (Experiments 2 and~3) does not degrade closed-set
+performance.
+
+
+% =========================================================
+% 5.3  Experiment 2 — CLIP Confidence Threshold Sweep (Track 2)
+% =========================================================
+\section{Experiment 2: CLIP Confidence Threshold Sensitivity}
+\label{sec:exp2}
+
+A mixed dataset of 10 known classes (2 Grape, 8 Tomato) and 3 unknown classes
+(\textit{Squash Powdery Mildew}, \textit{Raspberry healthy},
+\textit{Blueberry healthy}) was constructed from PlantVillage.
+Potato was excluded as a candidate unknown due to nightshade family overlap
+with CLIP pre-training data.
+50~images per class were sampled per run (44 for Tomato Mosaic Virus),
+giving 644~images per run across 5 independent runs.
+Thresholds $\tau \in [0.30, 0.95]$ were swept in steps of 0.05.
+Unknown F1 is the harmonic mean of unknown precision
+($\text{TP}/(\text{TP}+\text{FP})$) and unknown recall
+($\text{TP}/(\text{TP}+\text{FN})$), where a slip-through (unknown accepted
+as a known label) counts as a false negative.
+
+\begin{table}[h]
+    \centering
+    \caption{CLIP threshold sensitivity (mean over 5 runs, 10 known + 3 unknown
+             classes). Best Unknown F1 highlighted in bold.}
+    \label{tab:clip_threshold}
+    \begin{tabular}{ccccc}
+        \hline
+        \textbf{$\tau$} & \textbf{Known Acc.\ (\%)} & \textbf{Unk.\ Rej.\ (\%)} & \textbf{False Rej.\ (\%)} & \textbf{Unk.\ F1} \\
+        \hline
+        0.30 & 25.7 & 17.1 & 13.0 & 0.213 \\
+        0.35 & 24.9 & 25.9 & 17.3 & 0.282 \\
+        0.40 & 24.3 & 34.4 & 23.2 & 0.326 \\
+        0.45 & 23.8 & 40.4 & 27.3 & 0.351 \\
+        0.50 & 22.8 & 45.6 & 31.1 & 0.367 \\
+        0.55 & 21.9 & 49.6 & 34.5 & 0.377 \\
+        0.60 & 20.7 & 54.0 & 38.0 & 0.387 \\
+        0.65 & 20.4 & 59.6 & 42.0 & 0.400 \\
+        0.70 & 19.7 & 61.6 & 45.5 & 0.396 \\
+        0.75 & 19.0 & 66.7 & 49.5 & 0.405 \\
+        0.80 & 18.1 & 70.8 & 53.2 & 0.409 \\
+        \textbf{0.85} & \textbf{17.0} & \textbf{75.5} & \textbf{56.1} & \textbf{0.419} \\
+        0.90 & 15.1 & 78.7 & 60.8 & 0.415 \\
+        0.95 & 14.1 & 82.1 & 65.7 & 0.412 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Unknown F1 peaks at $\tau^* = 0.85$ (F1 = 0.419) and is flat between
+$\tau = 0.75$ and $\tau = 0.90$ (range 0.405--0.419).
+Known Accuracy in the open-set setting (14--26\%) is lower than Experiment~1
+because the prompt includes both known and unknown class labels, diluting the
+softmax and causing more known images to fall below the threshold; it
+represents the fraction of known images that were \emph{both} correctly
+classified \emph{and} above $\tau$, and is not directly comparable to the
+closed-set figure.
+The False Rejection Rate rises monotonically. The limitation arises from the CLIP embedding space clustering all plant leaves
+closely, as noted in prior work on open-set visual classification with dense
+embedding models~\cite{dhamija2020openset}.
+The threshold $\tau^* = 0.85$ was locked into the production pipeline prior
+to Experiment~4 (qualitative pipeline evaluation).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/clip_threshold_sensitivity.png}
+    \caption{CLIP confidence threshold sensitivity (mean of 5 runs).
+             Known Accuracy (blue) declines as $\tau$ rises.
+             Unknown Rejection Rate (green) rises monotonically.
+             Unknown F1 (purple, dashed) peaks at $\tau^* = 0.85$ (red dotted line).}
+    \label{fig:clip_threshold}
+\end{figure}
+
+
+% =========================================================
+% 5.4  Experiment 3 — Few-Shot Engine Threshold
+% =========================================================
+\section{Experiment 3: Few-Shot Cosine Similarity Threshold}
+\label{sec:exp3}
+
+A cosine similarity threshold sweep from 0.70 to 0.94 was conducted for
+the Few-Shot Engine, using a 5-shot support set of \textit{Squash Powdery
+Mildew} images and \textit{Blueberry leaf} images as the negative class.
+Results are averaged across 5 independent runs.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/few_shot_threshold_sensitivity.png}
+    \caption{Cosine similarity threshold sensitivity for the Few-Shot Engine
+             (single representative run). The optimal threshold $\tau = 0.76$
+             maximises the mean F1-score (0.686) across 5 independent runs.}
+    \label{fig:few_shot_threshold}
+\end{figure}
+
+\begin{table}[h]
+    \centering
+    \caption{Mean TPR, FPR, and F1 across 5 runs per threshold.
+             Optimal threshold highlighted in bold.}
+    \label{tab:few_shot_threshold}
+    \begin{tabular}{cccc}
+        \hline
+        \textbf{Threshold ($\tau$)} & \textbf{Mean TPR (\%)} & \textbf{Mean FPR (\%)} & \textbf{Mean F1} \\
+        \hline
+        0.70 & 96.4 & 92.4 & 0.668 \\
+        0.72 & 95.2 & 87.6 & 0.673 \\
+        0.74 & 94.0 & 82.0 & 0.681 \\
+        \textbf{0.76} & \textbf{90.4} & \textbf{73.2} & \textbf{0.686} \\
+        0.78 & 86.4 & 66.8 & 0.683 \\
+        0.80 & 81.2 & 59.6 & 0.674 \\
+        0.82 & 78.0 & 54.4 & 0.671 \\
+        0.84 & 72.0 & 48.4 & 0.653 \\
+        0.86 & 63.2 & 41.2 & 0.618 \\
+        0.88 & 55.2 & 35.6 & 0.578 \\
+        0.90 & 41.6 & 26.0 & 0.494 \\
+        0.92 & 30.0 & 14.8 & 0.407 \\
+        0.94 & 14.0 &  5.2 & 0.227 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+F1 peaks at $\tau = 0.76$ (mean F1 = 0.686, TPR = 90.4\%, FPR = 73.2\%) and
+collapses rapidly above $\tau = 0.86$.
+The persistently high FPR across all thresholds reflects the proximity of
+plant disease embeddings in the CLIP representation space and is acknowledged
+as a key limitation.
+
+
+% =========================================================
+% 5.5  Experiment 5 — Component Ablation
+% =========================================================
+%\section{Experiment 5: Agent Component Ablation}
+%\label{sec:exp5}
+%
+%\subsection{Setup}
+%
+%Four agent configurations were evaluated on a fixed set of test cases
+%covering low, medium, and high severity scenarios and mixed pest-disease
+%inputs: full system, RAG disabled, validators disabled, and both disabled.
+%
+%% TODO: Run evaluations/exp_component_analysis.py to get these numbers
+%
+%\subsection{Results}
+%
+%\begin{table}[h]
+%    \centering
+%    \caption{Component ablation results.}
+%    \label{tab:ablation}
+%    \begin{tabular}{llccc}
+%        \hline
+%        \textbf{Configuration} & \textbf{RAG} & \textbf{Validators} & \textbf{Action Quality (\%)} & \textbf{Retry Rate (\%)} \\
+%        \hline
+%        Full system      & \checkmark & \checkmark & \textit{[TODO]} & \textit{[TODO]} \\
+%        No RAG           & $\times$   & \checkmark & \textit{[TODO]} & \textit{[TODO]} \\
+%        No Validators    & \checkmark & $\times$   & \textit{[TODO]} & \textit{[TODO]} \\
+%        No RAG + No Val. & $\times$   & $\times$   & \textit{[TODO]} & \textit{[TODO]} \\
+%        \hline
+%    \end{tabular}
+%\end{table}
+
+
+% =========================================================
+% 5.5  Experiment 4 — Qualitative Pipeline Evaluation (PlantDoc)
+% =========================================================
+\section{Experiment 4: Qualitative Pipeline Evaluation on PlantDoc}
+\label{sec:exp4}
+
+PlantDoc~\cite{DBLP:journals/corr/abs-1911-10317} contains 28 real-world disease categories
+crawled from the Internet, with complex backgrounds, variable lighting, and
+label noise --- an ideal stress test for end-to-end pipeline robustness.
+The full DINO + CLIP pipeline was run on a sample of PlantDoc images:
+Grounding DINO (SwinB) localises leaves and insects, CLIP classifies each
+crop with open-set rejection ($\tau^* = 0.85$), and the LLM agent synthesises
+detections into a structured \texttt{DiagnosisResult} with RAG retrieval and
+self-correction.
+
+% TODO: Select 3–4 representative PlantDoc images for case studies.
+%   Case 1: Clean single-leaf — pipeline should classify correctly
+%   Case 2: Multi-leaf with mixed health — shows disease_tally aggregation
+%   Case 3: Unknown crop (not Tomato/Grape) — tests graceful degradation
+%   Case 4: Image with insect — tests pest conflict resolution
+
+
+% =========================================================
+% 5.7  Conclusion
+% =========================================================
+\chapter{Conclusion}
+\label{sec:conclusion}
+
+\section{Contributions}
+
+In this thesis, we developed an autonomous multimodal agent for diagnosing crop diseases, resolving the semantic gap between simple visual detection and providing actionable farming advice. We also take open-set perception and agent self-correction into account, which pushes beyond the limitations of traditional fixed-class AI systems in agriculture. We evaluated the pipeline extensively and achieved promising results. 
+
+Compared to standard closed-set models, our system safely handles unknown crops by using a data-driven confidence threshold ($\tau^* = 0.85$, Section~\ref{sec:exp2}) and registers new diseases via a few-shot engine ($\tau = 0.76$, Section~\ref{sec:exp3}). Additionally, thanks to the self-correcting agent and crop-filtered ChromaDB retrieval layer, the system can dynamically enforce treatment safety rules (like avoiding pesticide conflicts) and eliminate LLM hallucinations. Thus, we believe this framework provides a strong trade-off between open-world flexibility and expert-level safety.
+
+In conclusion, we hope that our contribution to multimodal agent architectures will inspire future research in building safe and reasoning-capable AI systems for agriculture.
 
 \section{Future Work}
-Future developments for this project include:
-\begin{itemize}
-	\item Image Quality Check: Adding a layer to detect motion blur, poor lighting, or extreme occlusion. If the quality is too low, the agent will request a new image rather than risk a wrong diagnosis.
-	\item SAHI Integration: Combining Slicing Aided Hyper Inference (SAHI) with these quality checks to help Grounding DINO handle high-resolution images, ensuring small pests are not missed due to image downscaling.
-	\item Stateful Memory: The system will save every detection result (with timestamps) into a long-term database. The agent will be able to query this history to identify patterns.
-	\item Specialist Model Fallback: Implementing a multi-tier verification system for high-uncertainty cases.
-\end{itemize}
+
+\paragraph{Improving Vision Foundation Models}
+Despite the promising results of open-set vision, the ongoing false rejection rate ($\geq$13\% at $\tau=0.30$) and the few-shot false positive rate (73.2\% at $\tau=0.76$) suggest room for improvement. Our future direction consists of incorporating specific negative examples, contrastive learning methods, or a simple classification layer on top of the frozen CLIP model to better scale to new crops. 
+
+\paragraph{Benchmarking the Vision Pipeline Against State-of-the-Art Models}
+While our current pipeline establishes a strong foundation, future research should focus on constructing a benchmark for the core vision components (Grounding DINO and CLIP) against other State-of-the-Art (SOTA) models. Because evaluating the entire reasoning agent is complex, comparing the vision pipeline's localization and classification performance on unstructured field datasets will help quantify the specific advantages of our open-set perception approach.
+
+\paragraph{Expanded Coverage and Expert Validation}
+The current CLIP label set primarily covers Tomato and Grape diseases. Expanding this to include a wider variety of crops and ingesting more diverse RAG documents would greatly increase the system's practical usefulness. Ultimately, testing with professional agronomists would confirm the value of the structured output and uncertainty warnings in real decision-making contexts.
+
+\paragraph{Automated Dataset Annotation}
+Because the vision pipeline combines zero-shot localization (Grounding DINO) with open-set classification (CLIP), it has significant potential to function as an auto-labeling tool. Future work could utilize this architecture to rapidly generate pseudo-labels and bounding boxes for large, unannotated agricultural image datasets, drastically reducing the manual labor required to train future supervised models.

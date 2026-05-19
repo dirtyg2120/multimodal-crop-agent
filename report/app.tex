@@ -8,7 +8,7 @@
 \section{Prototype}
 The framework is made publicly available on \href{https://github.com/dirtyg2120/multimodal-crop-agent}{https://github.com/dirtyg2120/multimodal-crop-agent}.
 
-The website’s homepage is very simple, just a place for user to upload an image.
+The website’s homepage is very simple, just a place for the user to upload an image.
 \begin{figure}[H]
 	\centering
 	\frame{\includegraphics[width=\textwidth]{images/1-main.png}}
@@ -16,7 +16,7 @@ The website’s homepage is very simple, just a place for user to upload an imag
 	\label{fig:main}
 \end{figure}
 
-The main page after user upload an image. There are 3 custom fields: ``caption, tex\_threshold and box\_threshold'' to custom the parameters for running Grouding DINO.
+The main page after the user uploads an image. There are 3 custom fields: ``caption, tex\_threshold and box\_threshold'' to custom the parameters for running Grounding DINO.
 
 \begin{figure}[H]
 	\centering
@@ -25,12 +25,12 @@ The main page after user upload an image. There are 3 custom fields: ``caption, 
 	\label{fig:upload}
 \end{figure}
 
-After user click ``Analyze Image'', the model will be applied and return labels with bounding box as shown. 
+After the user clicks ``Analyze Image'', the model will be applied and return labels with bounding box as shown. 
 
 \begin{figure}[H]
 \centering
 \frame{\includegraphics[width=\textwidth]{images/3-gdino.png}}
-\caption{Visualize the output result from running Grouding DINO}
+\caption{Visualize the output result from running Grounding DINO}
 \label{fig:gdino}
 \end{figure}
 
@@ -52,7 +52,7 @@ If user click on the ``Details'' expander of ``Invidual Leaf Inspection'' part. 
 	\label{fig:details}
 \end{figure}
 
-If user click on the ``Input'' expander of ``Agronomist Diagnosis'' part. It will display the input which will be send to AI Agent, and the part of retrieving RAG is run in the background.
+If the user clicks on the ``Input'' expander of ``Agronomist Diagnosis'' part. It will display the input which will be sent to the AI Agent, and the part of retrieving RAG is run in the background.
 
 \begin{figure}[H]
 \centering
@@ -70,9 +70,9 @@ PyTorch is a popular open-source machine learning library primarily used for com
 The main reason for choosing PyTorch is its flexibility and its ability to perform high-speed calculations on a GPU. This is essential for our agent because processing high-resolution images of crops requires significant computing power. By using PyTorch, the agent can analyze images quickly. It also provides a wide range of tools for handling image data, making it easier to integrate the vision system with the rest of the software stack.
 
 \subsection{Pydantic AI}
-Pydantic AI is a specialized framework designed to manage how AI agents behave and make decisions. It serves as the ``brain''that controls the flow of our ``Observe-Verify-Reason-Act''loop. While many other tools focus only on sending prompts to a model, Pydantic AI ensures that every piece of information moving through the system follows a strict format.
+Pydantic AI is a specialized framework designed to manage how AI agents behave and make decisions. It serves as the ``brain'' that controls the flow of our ``Observe-Verify-Reason-Act'' loop. While many other tools focus only on sending prompts to a model, Pydantic AI ensures that every piece of information moving through the system follows a strict format.
 
-I use this framework to define exactly what the input and output should look like for each step. For example, when the vision module identifies a disease, Pydantic AI checks that the data is sent in the correct structure (such as a specific list of names and confidence scores) before passing it to the reasoning module. This strict data validation prevents the agent from making errors caused by messy or unexpected information. It makes the system more reliable because the AI is forced to follow a predictable path, reducing the chance of ``hallucinations or logical mistakes.
+I use this framework to define exactly what the input and output should look like for each step. For example, when the vision module identifies a disease, Pydantic AI checks that the data is sent in the correct structure (such as a specific list of names and confidence scores) before passing it to the reasoning module. This strict data validation prevents the agent from making errors caused by messy or unexpected information. It makes the system more reliable because the AI is forced to follow a predictable path, reducing the chance of ``hallucinations'' or logical mistakes.
 
 \subsection{LlamaIndex}
 LlamaIndex is a data framework used to connect our Large Language Model (LLM) with external data sources. This process is known as Retrieval-Augmented Generation (RAG). In this project, the agent needs more than just general knowledge; it needs specific, expert-level information about tomato diseases, pests, and treatment protocols.

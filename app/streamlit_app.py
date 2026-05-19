@@ -7,7 +7,7 @@ from PIL import Image
 
 from groundingdino.util.inference import predict, load_model, annotate, load_image
 
-from app.pipe import VisionSystem, analyze_full_plant, CLIP_CONFIDENCE_THRESHOLD
+from app.pipe import VisionSystem, analyze_full_plant, classify_crops, CLIP_CONFIDENCE_THRESHOLD
 from app.few_shot_engine import FewShotEngine
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -51,6 +51,42 @@ def classify_with_fewshot(vision_system, few_shot_engine, crop_np):
         if matched:
             return fs_label, fs_score, True
     return label, conf, False
+
+
+def annotate_with_clip_labels(image_source, crops_data, detections):
+    """
+    Re-draws bounding boxes using CLIP-resolved labels instead of DINO's
+    generic 'leaf'/'bug' phrases.
+
+    detections: list of DetectedObject (label, confidence, box pixel coords, crop_id)
+    """
+    h, w, _ = image_source.shape
+
+    # Build tensors in the same format annotate() expects
+    boxes_list, logits_list, phrases_list = [], [], []
+    for obj in detections:
+        x1, y1, x2, y2 = obj.box
+        # Convert pixel bbox → normalised cx, cy, bw, bh
+        cx = ((x1 + x2) / 2) / w
+        cy = ((y1 + y2) / 2) / h
+        bw = (x2 - x1) / w
+        bh = (y2 - y1) / h
+        boxes_list.append([cx, cy, bw, bh])
+        logits_list.append(obj.confidence)
+        phrases_list.append(obj.label)
+
+    if not boxes_list:
+        return image_source  # nothing to draw
+
+    boxes_t  = torch.tensor(boxes_list,  dtype=torch.float32)
+    logits_t = torch.tensor(logits_list, dtype=torch.float32)
+
+    return annotate(
+        image_source=image_source,
+        boxes=boxes_t,
+        logits=logits_t,
+        phrases=phrases_list,
+    )
 
 
 def main():
@@ -103,33 +139,42 @@ def main():
                 caption=TEXT_PROMPT, box_threshold=box_threshold,
                 text_threshold=text_threshold, device=DEVICE,
             )
-            with col2:
-                st.image(annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases),
-                         caption="Detections")
 
         crops_data = extract_crops(image_source, boxes, phrases)
         st.success(f"Found {len(crops_data)} objects.")
 
-        with st.spinner("Consulting Agronomist Agent..."):
+        # Step 1: CLIP classification (fast) — show annotated image right away
+        with st.spinner("Classifying leaves..."):
+            detections = classify_crops(crops_data, vision_system, few_shot_engine)
+            clip_annotated = annotate_with_clip_labels(image_source, crops_data, detections)
+
+        with col2:
+            st.image(clip_annotated, caption="Detections (CLIP labels)")
+
+        # Step 2: Agent reasoning (slow) — uses pre-computed detections, no double CLIP
+        with st.spinner("Agent is thinking..."):
             results = asyncio.run(analyze_full_plant(
-                crops_data, vision_system=vision_system, few_shot_engine=few_shot_engine
+                crops_data, vision_system=vision_system,
+                few_shot_engine=few_shot_engine, detections=detections
             ))
 
-        # Store everything in session_state for display on subsequent reruns
+        # Persist to session_state for reruns
         st.session_state.results = results
         st.session_state.crops_data = crops_data
-        # Derive unknown crops from what the pipeline actually labelled as Unknown
-        # — avoids re-running CLIP a second time
-        unknown_crops = []
-        if results:
-            for obj in results["detections"]:
-                if obj.label == "Unknown":
-                    unknown_crops.append(crops_data[obj.crop_id]["crop"])
-        st.session_state.unknown_crops = unknown_crops
+        st.session_state.image_source = image_source
+        st.session_state.clip_annotated = clip_annotated
+        unknown_crops = [det for det in detections if det.label == "Unknown"]
+        st.session_state.unknown_crops = [crops_data[obj.crop_id]["crop"] for obj in unknown_crops]
 
     # --- Results display: always shown if results exist in session_state ---
-    results    = st.session_state.results
-    crops_data = st.session_state.crops_data
+    results         = st.session_state.results
+    crops_data      = st.session_state.crops_data
+    clip_annotated  = st.session_state.get("clip_annotated")
+
+    # # Re-display the CLIP-annotated image on subsequent reruns (e.g. after Register & Save)
+    # if clip_annotated is not None:
+    #     with col2:
+    #         st.image(clip_annotated, caption="Detections (CLIP labels)")
 
     if results:
         agent_json = results["agent_response"]
