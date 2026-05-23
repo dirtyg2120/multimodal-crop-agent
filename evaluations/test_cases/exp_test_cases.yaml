@@ -1,18 +1,9 @@
-# Test Cases for Component Analysis (Experiment 5.4)
-#
-# Each test case validates specific agent behaviors:
-# - Disease severity assessment
-# - Pest conflict resolution (beneficial vs harmful)
-# - RAG integration
-# - Self-correction validators
-#
-# Recommended: 10-15 test cases for thesis validation
 
 test_cases:
   # ============================================================================
   # DISEASE SEVERITY TESTS (High, Medium, Low)
   # ============================================================================
-  
+
   - id: TC001
     name: "High Disease Severity + Harmful Pest"
     description: "Tests high severity detection and chemical recommendation"
@@ -85,7 +76,7 @@ test_cases:
       severity_level: "Low"
       should_avoid_chemicals: true
       should_mention_beneficial: "Ladybug"
-      should_recommend_mechanical: true
+      # Note: mechanical/cultural control is expected but not checked by evaluator
 
   - id: TC005
     name: "Only Beneficial Insects"
@@ -118,6 +109,7 @@ test_cases:
         "Aphid": 12
         "Whitefly": 8
     ground_truth:
+      severity_level: "High"
       should_have_pesticides: true
       should_mention_pest: "Aphid"
 
@@ -178,8 +170,9 @@ test_cases:
         "Ladybug": 2
     ground_truth:
       severity_level: "High"
+      infection_ratio_range: [0.55, 0.70]
       should_mention_disease: "Bacterial spot"
-      should_avoid_chemicals: true  # Because of ladybugs
+      should_avoid_chemicals: true  # Ladybug presence blocks chemical use
       should_mention_beneficial: "Ladybug"
 
   - id: TC010
@@ -195,6 +188,7 @@ test_cases:
       pest_counts:
         "Aphid": 15
     ground_truth:
+      severity_level: "Medium"  # Low disease but high pest pressure elevates severity
       should_have_pesticides: true
       should_mention_pest: "Aphid"
 
@@ -218,28 +212,29 @@ test_cases:
       infection_ratio_range: [0.45, 0.55]
 
   - id: TC012
-    name: "Single Leaf Infected"
-    description: "Tests minimal infection scenario"
+    name: "Corn Common Rust - Crop Diversity"
+    description: "Tests agent on Corn crop with rust disease; validates RAG retrieval for Corn"
     deps:
       user_id: "test"
-      crop_name: "Tomato"
-      total_leaves: 10
-      healthy_count: 9
+      crop_name: "Corn"
+      total_leaves: 9
+      healthy_count: 4
       disease_counts:
-        "Septoria leaf spot": 1
+        "Common rust": 5
       pest_counts: {}
     ground_truth:
-      severity_level: "Low"
-      infection_ratio_range: [0.05, 0.15]
-      should_have_pesticides: false
+      severity_level: "Medium"
+      infection_ratio_range: [0.50, 0.65]
+      should_mention_disease: "Common rust"
+      should_have_pesticides: true
 
   # ============================================================================
-  # DIFFERENT CROP TESTS (Optional - add if you have multi-crop data)
+  # DIFFERENT CROP TESTS
   # ============================================================================
 
   - id: TC013
     name: "Durian Leaf Blight"
-    description: "Tests RAG retrieval for different crop"
+    description: "Tests RAG retrieval for Durian crop"
     deps:
       user_id: "test"
       crop_name: "Durian"
@@ -252,6 +247,7 @@ test_cases:
       severity_level: "High"
       should_mention_disease: "Leaf Blight"
       infection_ratio_range: [0.60, 0.70]
+      should_have_pesticides: true
 
   - id: TC014
     name: "Durian with Beneficial Insects"
@@ -271,7 +267,7 @@ test_cases:
 
   - id: TC015
     name: "Unknown Crop Stress Test"
-    description: "Tests agent behavior with crop not in RAG database"
+    description: "Tests agent fallback to general knowledge when crop is not in RAG database"
     deps:
       user_id: "test"
       crop_name: "Dragon Fruit"
@@ -283,4 +279,51 @@ test_cases:
     ground_truth:
       severity_level: "High"
       infection_ratio_range: [0.50, 0.65]
-      # Agent should fall back to general knowledge
+      should_have_pesticides: false  # Agent should not hallucinate specific chemicals for unknown crop/disease
+
+  # ============================================================================
+  # RAG VALIDATION TEST
+  # ============================================================================
+
+  - id: TC016
+    name: "Rice Bacterial Blight - RAG Retrieval Test"
+    description: "Tests RAG retrieval for Rice-specific treatment knowledge. No RAG config
+      should produce vague or hallucinated recommendations vs Full system."
+    deps:
+      user_id: "test"
+      crop_name: "Rice"
+      total_leaves: 8
+      healthy_count: 2
+      disease_counts:
+        "Bacterial blight": 6
+      pest_counts: {}
+    ground_truth:
+      severity_level: "High"
+      infection_ratio_range: [0.70, 0.82]
+      should_mention_disease: "Bacterial blight"
+      should_have_pesticides: true
+
+  # ============================================================================
+  # VALIDATOR TRIGGER TEST
+  # ============================================================================
+
+  - id: TC017
+    name: "Validator Trigger - Beneficial Insect Blocks Pesticide"
+    description: "Low disease + mixed pests. Bee presence should block chemical recommendations
+      even though Whitefly would normally trigger them. Tests validator enforcement of
+      the beneficial-insect safety rule."
+    deps:
+      user_id: "test"
+      crop_name: "Tomato"
+      total_leaves: 12
+      healthy_count: 10
+      disease_counts:
+        "Septoria leaf spot": 2
+      pest_counts:
+        "Bee": 3
+        "Whitefly": 2
+    ground_truth:
+      severity_level: "Low"
+      should_have_pesticides: false
+      should_avoid_chemicals: true
+      should_mention_beneficial: "Bee"
