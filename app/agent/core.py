@@ -48,6 +48,14 @@ class DiagnosisResult(BaseModel):
             _validator_log.append({'rule': 'ratio_severity_mismatch', 'severity': self.severity_level, 'ratio': self.infection_ratio, 'ts': datetime.now().isoformat()})
             raise ModelRetry(f"Self-Correction: Logical Error. You calculated an infection ratio of {self.infection_ratio:.2f} (High) but marked severity as 'Low'. Please fix the severity level.")
 
+        if self.severity_level == "Low" and self.required_pesticides and len(self.required_pesticides) > 0:
+            _validator_log.append({'rule': 'low_severity_with_pesticide', 'severity': self.severity_level, 'pesticides': self.required_pesticides, 'ts': datetime.now().isoformat()})
+            raise ModelRetry(
+                "Self-Correction: You marked severity as 'Low' but recommended chemical pesticides. "
+                "Low severity requires only cultural or organic methods (pruning, monitoring, neem oil, water spray). "
+                "Set required_pesticides to null, or upgrade severity_level if the situation is worse than Low."
+            )
+
         return self
 
 
@@ -74,11 +82,13 @@ agronomy_agent = Agent(
 
         "### 2. PEST PROTOCOL (Based on 'pest_counts')\n"
         "   - **Beneficial Insects:** (e.g., Ladybug, Bee, Spider, Wasp, Dragonfly)\n"
-        "     -> **ACTION:** PROTECT. Do NOT recommend pesticides. State that they help control other pests.\n"
+        "     -> **ACTION:** PROTECT. NEVER recommend any pesticide. State they help control other pests naturally.\n"
+        "     -> If ONLY beneficial insects are detected (no harmful pests, no disease): set required_pesticides to null.\n"
         "   - **Harmful Pests:** (e.g., Aphid, Whitefly, Mite, Beetle, Caterpillar, Worm)\n"
-        "     -> **Low Population (< 3 detected):** Recommend mechanical removal (hand-picking) or water spray or something else.\n"
+        "     -> **Low Population (< 3 detected):** Recommend mechanical removal (hand-picking) or water spray.\n"
         "     -> **High Population (>= 3 detected):** Recommend chemical/organic intervention (Neem Oil, Insecticidal Soap, ...).\n"
-        "   - **Conflict Rule:** If BOTH Beneficial and Harmful pests are present, prioritize NON-CHEMICAL methods to avoid killing the 'good guys'.\n\n"
+        "   - **Conflict Rule:** If BOTH Beneficial AND Harmful pests are present, you MUST use ONLY non-chemical methods "
+        "(e.g., hand removal, water spray, physical barriers). Set required_pesticides to null. "
 
         "### 3. UNKNOWN DISEASE PROTOCOL\n"
         "   - If 'disease_counts' contains 'Unknown disease', CLIP confidence was too low to identify it.\n"
@@ -92,8 +102,12 @@ agronomy_agent = Agent(
         "   - You MUST provide a `reasoning_trace` before your final plan.\n\n"
 
         "### 5. LANGUAGE & TRANSLATION PROTOCOL\n"
-        "   - You MUST output all your responses (reasoning, status, actions, etc.) in **Vietnamese**, as the target users are Vietnamese farmers.\n"
+        "   - You MUST output `reasoning` and `recommended_actions` in **Vietnamese**, as the target users are Vietnamese farmers.\n"
         "   - **Exception for Medicines/Chemicals**: Keep complex pesticide, chemical, or active ingredient names in **English** (e.g., Imidacloprid, Copper Fungicide).\n"
-        "   - If the English chemical name has a common, simple Vietnamese classification, provide it in brackets immediately after the English name. Example: 'Copper Fungicide (thuốc diệt nấm)' or 'Imidacloprid (thuốc trừ sâu)'."
+        "   - If the English chemical name has a common, simple Vietnamese classification, provide it in brackets immediately after the English name. Example: 'Copper Fungicide (thuốc diệt nấm)' or 'Imidacloprid (thuốc trừ sâu)'.\n"
+        "   - **Structured fields MUST stay in English** (these are parsed programmatically):\n"
+        "     - `severity_level`: MUST be exactly one of: 'Low', 'Medium', 'High'\n"
+        "     - `overall_health_status`: MUST be exactly one of: 'Healthy', 'Mild Infection', 'Severe Infestation'\n"
+        "     - `identified_pathogens`: Keep disease/pest names in English\n"
     )
 )

@@ -9,8 +9,7 @@ from transformers import CLIPModel, CLIPProcessor
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-CONFIDENCE_THRESHOLD = 0.5
-
+CONFIDENCE_THRESHOLD = 0.35
 from app.vision.clip_labels import DISEASE_LABELS
 
 class CLIPClassifier:

@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 log = logging.getLogger(__name__)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-CLIP_CONFIDENCE_THRESHOLD = 0.5  # below this → "Unknown" (open-set rejection)
+CLIP_CONFIDENCE_THRESHOLD = 0.5  # below this → "Unknown"
 
 
 class VisionSystem:
@@ -28,8 +28,9 @@ class VisionSystem:
         self.insect_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
         log.info("✅ Models Loaded.")
 
-    def classify_leaf(self, image_crop: np.ndarray):
-        return self._run_clip(image_crop, DISEASE_LABELS, self.plant_model, self.plant_processor)
+    def classify_leaf(self, image_crop: np.ndarray, labels: list = None):
+        active = labels if labels else DISEASE_LABELS
+        return self._run_clip(image_crop, active, self.plant_model, self.plant_processor)
 
     def classify_pest(self, image_crop: np.ndarray):
         return self._run_clip(image_crop, INSECT_LABELS, self.insect_model, self.insect_processor)
@@ -46,17 +47,19 @@ class VisionSystem:
         return labels[top_idx.item()], top_prob_val
 
 
-def classify_crops(crops_data: list, vision_system: VisionSystem, few_shot_engine=None) -> list:
+def classify_crops(crops_data: list, vision_system: VisionSystem, few_shot_engine=None,
+                   disease_labels: list = None) -> list:
     """
     CLIP classification pass only — no agent.
     Returns a list of DetectedObject so the caller can display results immediately
     before the (slow) agent runs.
+    disease_labels: optional override for DISEASE_LABELS (from UI).
     """
     detected_objects = []
     for i, item in enumerate(crops_data):
         label_lower = item['label'].lower()
         if "leaf" in label_lower:
-            full_label, conf = vision_system.classify_leaf(item['crop'])
+            full_label, conf = vision_system.classify_leaf(item['crop'], labels=disease_labels)
 
             if full_label == "Unknown" and few_shot_engine and few_shot_engine.prototypes:
                 pil = Image.fromarray(item['crop'])

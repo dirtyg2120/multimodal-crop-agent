@@ -32,7 +32,10 @@ def _get_index() -> VectorStoreIndex:
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     chroma_db_dir = os.path.join(base_dir, "data", "chroma_db")
     db_client = chromadb.PersistentClient(path=chroma_db_dir)
-    chroma_collection = db_client.get_or_create_collection("agronomy_manuals")
+    chroma_collection = db_client.get_or_create_collection(
+        "agronomy_manuals",
+        metadata={"hnsw:space": "cosine"},
+    )
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     return VectorStoreIndex.from_vector_store(vector_store, embed_model=Settings.embed_model)
 

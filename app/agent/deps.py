@@ -20,7 +20,6 @@ class AgronomyDeps:
 
     # Component toggles (used by exp_component_analysis.py)
     enable_rag: bool = True
-    enable_validators: bool = True
 
     def to_dict(self):
         return asdict(self)

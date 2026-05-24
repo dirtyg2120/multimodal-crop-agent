@@ -9,6 +9,7 @@ from groundingdino.util.inference import predict, load_model, annotate, load_ima
 
 from app.pipe import VisionSystem, analyze_full_plant, classify_crops, CLIP_CONFIDENCE_THRESHOLD
 from app.few_shot_engine import FewShotEngine
+from app.vision.clip_labels import DISEASE_LABELS
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 GDINO_CONFIG = "app/groundingdino/config/GroundingDINO_SwinB_cfg.py"
@@ -104,8 +105,10 @@ def main():
         st.session_state.crops_data = None
     if "unknown_crops" not in st.session_state:
         st.session_state.unknown_crops = []
+    if "active_disease_labels" not in st.session_state:
+        st.session_state.active_disease_labels = DISEASE_LABELS[:]
 
-    # Sidebar: registered prototypes
+    # Sidebar: registered prototypes only
     with st.sidebar:
         st.header("Few-Shot Prototypes")
         if few_shot_engine.prototypes:
@@ -122,6 +125,30 @@ def main():
     box_threshold = col_box.slider("box_threshold", 0.0, 1.0, 0.30, 0.01)
     text_threshold = col_txt.slider("text_threshold", 0.0, 1.0, 0.25, 0.01)
 
+    with st.expander("🏷️ Edit Disease Labels", expanded=False):
+        st.caption(
+            f"Active: **{len(st.session_state.active_disease_labels)}** labels  ·  "
+            "One label per line  ·  Changes apply on next \'Analyze Image\'."
+        )
+        edited_text = st.text_area(
+            "Disease labels",
+            value="\n".join(st.session_state.active_disease_labels),
+            height=250,
+            key="label_editor",
+            label_visibility="collapsed",
+        )
+        col_save, col_reset = st.columns([1, 1])
+        if col_save.button("💾 Save labels", use_container_width=True):
+            parsed = [ln.strip() for ln in edited_text.splitlines() if ln.strip()]
+            if parsed:
+                st.session_state.active_disease_labels = parsed
+                st.success(f"✅ {len(parsed)} labels saved.")
+            else:
+                st.error("Label list cannot be empty.")
+        if col_reset.button("↩️ Reset to defaults", use_container_width=True):
+            st.session_state.active_disease_labels = DISEASE_LABELS[:]
+            st.rerun()
+
     temp_path = "temp_uploaded_image.jpg"
     with open(temp_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
@@ -130,7 +157,7 @@ def main():
     with col1:
         st.image(uploaded_file, caption="Original Image")
 
-    # --- Analyze button: runs analysis and stores everything in session_state ---
+    # --- Analyze button: DINO + CLIP only, no agent ---
     if st.button("Analyze Image", type="primary"):
         with st.spinner("Detecting objects..."):
             image_source, image_transformed = load_image(temp_path)
@@ -143,38 +170,46 @@ def main():
         crops_data = extract_crops(image_source, boxes, phrases)
         st.success(f"Found {len(crops_data)} objects.")
 
-        # Step 1: CLIP classification (fast) — show annotated image right away
         with st.spinner("Classifying leaves..."):
-            detections = classify_crops(crops_data, vision_system, few_shot_engine)
+            detections = classify_crops(
+                crops_data, vision_system, few_shot_engine,
+                disease_labels=st.session_state.active_disease_labels,
+            )
             clip_annotated = annotate_with_clip_labels(image_source, crops_data, detections)
 
         with col2:
             st.image(clip_annotated, caption="Detections (CLIP labels)")
 
-        # Step 2: Agent reasoning (slow) — uses pre-computed detections, no double CLIP
-        with st.spinner("Agent is thinking..."):
-            results = asyncio.run(analyze_full_plant(
-                crops_data, vision_system=vision_system,
-                few_shot_engine=few_shot_engine, detections=detections
-            ))
-
-        # Persist to session_state for reruns
-        st.session_state.results = results
-        st.session_state.crops_data = crops_data
-        st.session_state.image_source = image_source
+        # Persist detection results; reset stale agent output from previous image
+        st.session_state.crops_data     = crops_data
+        st.session_state.detections     = detections
+        st.session_state.image_source   = image_source
         st.session_state.clip_annotated = clip_annotated
+        st.session_state.results        = None
         unknown_crops = [det for det in detections if det.label == "Unknown"]
-        st.session_state.unknown_crops = [crops_data[obj.crop_id]["crop"] for obj in unknown_crops]
+        st.session_state.unknown_crops  = [crops_data[obj.crop_id]["crop"] for obj in unknown_crops]
 
-    # --- Results display: always shown if results exist in session_state ---
-    results         = st.session_state.results
-    crops_data      = st.session_state.crops_data
-    clip_annotated  = st.session_state.get("clip_annotated")
+    # --- Re-display CLIP annotated image on reruns ---
+    elif st.session_state.get("clip_annotated") is not None:
+        with col2:
+            st.image(st.session_state.clip_annotated, caption="Detections (CLIP labels)")
 
-    # # Re-display the CLIP-annotated image on subsequent reruns (e.g. after Register & Save)
-    # if clip_annotated is not None:
-    #     with col2:
-    #         st.image(clip_annotated, caption="Detections (CLIP labels)")
+    # --- Agent button: shown only after detection has run ---
+    if st.session_state.get("detections") is not None:
+        st.divider()
+        if st.button("🧠 Run Agent Diagnosis", type="secondary"):
+            with st.spinner("Agent is thinking..."):
+                results = asyncio.run(analyze_full_plant(
+                    st.session_state.crops_data,
+                    vision_system=vision_system,
+                    few_shot_engine=few_shot_engine,
+                    detections=st.session_state.detections,
+                ))
+            st.session_state.results = results
+
+    # --- Results display ---
+    results    = st.session_state.results
+    crops_data = st.session_state.crops_data
 
     if results:
         agent_json = results["agent_response"]

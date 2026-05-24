@@ -31,10 +31,30 @@ Settings.embed_model = GoogleGenAIEmbedding(
 def get_crop_from_filename(filename: str) -> str:
     """Auto-tags documents based on filename keywords."""
     fname = filename.lower()
-    if "tomato" in fname: return "Tomato"
-    if "corn" in fname: return "Corn"
-    if "rice" in fname: return "Rice"
-    if "durian" in fname: return "Durian"
+    # Map to exact crop names used by CLIP labels in the app
+    crop_map = {
+        "tomato":     "Tomato",
+        "corn":       "Corn",
+        "maize":      "Corn",
+        "rice":       "Rice",
+        "durian":     "Durian",
+        "grape":      "Grape",
+        "apple":      "Apple",
+        "potato":     "Potato",
+        "pepper":     "Pepper",
+        "bell_pepper": "Pepper",
+        "strawberry": "Strawberry",
+        "soybean":    "Soybean",
+        "soyabean":   "Soybean",
+        "raspberry":  "Raspberry",
+        "blueberry":  "Blueberry",
+        "cherry":     "Cherry",
+        "peach":      "Peach",
+        "squash":     "Squash",
+    }
+    for keyword, crop in crop_map.items():
+        if keyword in fname:
+            return crop
     return "General"
 
 
@@ -108,18 +128,31 @@ def build_knowledge_base(target_path: str = None):
     # 4. Setup ChromaDB (Persistent Storage)
     print(f"   💾 Saving to ChromaDB at: {chroma_db_dir}")
     db_client = chromadb.PersistentClient(path=chroma_db_dir)
-    # try:
-    #     db_client.delete_collection(name="agronomy_manuals")
-    # except Exception:
-    #     pass
-    chroma_collection = db_client.get_or_create_collection("agronomy_manuals")
+    chroma_collection = db_client.get_or_create_collection(
+        "agronomy_manuals",
+        metadata={"hnsw:space": "cosine"},   # cosine similarity for text embeddings
+    )
+
+    # Deduplication: skip files already ingested by filename metadata
+    existing = chroma_collection.get(include=["metadatas"])
+    existing_files = {m["filename"] for m in existing["metadatas"] if "filename" in m}
+
+    # Filter out already-ingested documents
+    new_docs = [d for d in documents if d.metadata.get("filename") not in existing_files]
+    skipped  = len(documents) - len(new_docs)
+    if skipped:
+        print(f"   ⏭️  Skipping {skipped} already-ingested chunks (dedup).")
+    if not new_docs:
+        print("   ✅ All documents already in ChromaDB. Nothing to add.")
+        return
+
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     # 5. Indexing (Embeddings)
     # Note: We use 'from_documents' to add to the existing store
     VectorStoreIndex.from_documents(
-        documents, 
+        new_docs, 
         storage_context=storage_context,
         show_progress=True,
         embed_model=Settings.embed_model
