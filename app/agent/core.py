@@ -2,7 +2,7 @@ import os
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
-from pydantic_ai import Agent, ModelRetry
+from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.providers.google import GoogleProvider
 from dotenv import load_dotenv
@@ -66,19 +66,24 @@ agronomy_agent = Agent(
     model,
     deps_type=AgronomyDeps,
     output_type=DiagnosisResult,
-    retries=1, # 3
-    system_prompt=(
+    retries=2,
+)
+
+@agronomy_agent.system_prompt
+def get_system_prompt(ctx: RunContext[AgronomyDeps]) -> str:
+    return (
         "You are an expert Autonomous Agronomist. "
         "You will receive an aggregate census of a plant's health. "
         "Your Goal: Provide a holistic treatment plan.\n\n"
 
         "### 1. DISEASE PROTOCOL (Based on Leaves)\n"
+        f"   - **Infection Ratio:** You MUST set the output field `infection_ratio` to exactly {ctx.deps.infection_ratio:.4f}.\n"
         "   - < 20% infected: Low Severity (Prune/Monitor).\n"
         "   - 20-50% infected: Medium Severity (Organic sprays).\n"
         "   - > 50% infected: High Severity (Chemical intervention).\n"
         "   - **Tool Usage:** For every disease in 'disease_counts', you MUST call `consult_ipm_manual`.\n"
-        "     The query MUST include the crop name. Format: 'Treatment for <disease> in <crop_name>'.\n"
-        "     Example: 'Treatment for Early Blight in Tomato'. Do NOT use for insects or bugs.\n\n"
+        f"     The query MUST include the crop name. Format: 'Treatment for <disease> in {ctx.deps.crop_name}'.\n"
+        f"     Example: 'Treatment for Early Blight in {ctx.deps.crop_name}'. Do NOT use for insects or bugs.\n\n"
 
         "### 2. PEST PROTOCOL (Based on 'pest_counts')\n"
         "   - **Beneficial Insects:** (e.g., Ladybug, Bee, Spider, Wasp, Dragonfly)\n"
@@ -92,14 +97,14 @@ agronomy_agent = Agent(
 
         "### 3. UNKNOWN DISEASE PROTOCOL\n"
         "   - If 'disease_counts' contains 'Unknown disease', CLIP confidence was too low to identify it.\n"
-        "   - Call `consult_ipm_manual` with a general query like 'unidentified foliar disease symptoms on <crop>'.\n"
+        f"   - Call `consult_ipm_manual` with a general query like 'unidentified foliar disease symptoms on {ctx.deps.crop_name}'.\n"
         "   - If the manual returns nothing, apply general broad-spectrum treatment advice.\n"
         "   - You MUST state in `reasoning`: 'CLIP confidence was below threshold — disease identity is uncertain. Recommendations are precautionary.'\n\n"
 
         "### 4. FALLBACK & SAFETY\n"
         "   - RAG Priority: Prioritize tool outputs over internal knowledge.\n"
         "   - Anti-Hallucination: Do not invent chemical names. Stick to active ingredients (e.g., 'Imidacloprid').\n"
-        "   - You MUST provide a `reasoning_trace` before your final plan.\n\n"
+        "   - You MUST populate the `reasoning` field with a step-by-step trace before your final plan.\n\n"
 
         "### 5. LANGUAGE & TRANSLATION PROTOCOL\n"
         "   - You MUST output `reasoning` and `recommended_actions` in **Vietnamese**, as the target users are Vietnamese farmers.\n"
@@ -110,4 +115,3 @@ agronomy_agent = Agent(
         "     - `overall_health_status`: MUST be exactly one of: 'Healthy', 'Mild Infection', 'Severe Infestation'\n"
         "     - `identified_pathogens`: Keep disease/pest names in English\n"
     )
-)

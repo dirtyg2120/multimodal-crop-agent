@@ -46,10 +46,10 @@ Before running the app, you must build the vector database. Place your PDF manua
 
 ```bash
 # Ingest all manuals in the directory
-python -m app.rag.ingest --target ./data/manuals/
+python3 -m app.rag.ingest --target ./data/manuals/
 
 # Or ingest a specific file
-python -m app.rag.ingest --target ./data/manuals/abc.pdf
+python3 -m app.rag.ingest --target ./data/manuals/abc.pdf
 ```
 
 *This script uses **LlamaParse** to accurately extract tables and **Metadata Filtering** to tag documents by crop type.*

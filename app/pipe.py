@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 log = logging.getLogger(__name__)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-CLIP_CONFIDENCE_THRESHOLD = 0.5  # below this → "Unknown"
+CLIP_CONFIDENCE_THRESHOLD = 0.35  # below this → "Unknown"
 
 
 class VisionSystem:
@@ -30,19 +30,19 @@ class VisionSystem:
 
     def classify_leaf(self, image_crop: np.ndarray, labels: list = None):
         active = labels if labels else DISEASE_LABELS
-        return self._run_clip(image_crop, active, self.plant_model, self.plant_processor)
+        return self._run_clip(image_crop, active, self.plant_model, self.plant_processor, CLIP_CONFIDENCE_THRESHOLD)
 
     def classify_pest(self, image_crop: np.ndarray):
-        return self._run_clip(image_crop, INSECT_LABELS, self.insect_model, self.insect_processor)
+        return self._run_clip(image_crop, INSECT_LABELS, self.insect_model, self.insect_processor, 0)
 
-    def _run_clip(self, image_crop, labels, model, processor):
+    def _run_clip(self, image_crop, labels, model, processor, threshold=0):
         pil_image = Image.fromarray(image_crop)
         inputs = processor(text=labels, images=pil_image, return_tensors="pt", padding=True).to(DEVICE)
         with torch.no_grad():
             probs = model(**inputs).logits_per_image.softmax(dim=1)
         top_prob, top_idx = probs[0].max(dim=0)
         top_prob_val = top_prob.item()
-        if top_prob_val < CLIP_CONFIDENCE_THRESHOLD:
+        if top_prob_val < threshold:
             return "Unknown", top_prob_val
         return labels[top_idx.item()], top_prob_val
 
@@ -142,15 +142,14 @@ async def analyze_full_plant(
         f"- Diseased leaves (confirmed): {dict(disease_tally)}\n"
         f"- Unknown condition leaves (CLIP uncertain, identity unknown): {unknown_count}\n"
         f"- Pests detected: {dict(pest_tally)}\n"
-        f"\nIMPORTANT: Compute infection_ratio as confirmed_diseased_leaves / "
-        f"(healthy + confirmed_diseased). Do NOT count Unknown leaves as diseased.\n"
+        f"- Pre-calculated Infection Ratio: {deps.infection_ratio:.4f}\n"
     )
 
     user_prompt = (
         f"Here is the aggregate data for a crop image: \n{summary_text}\n"
         "TASKS:\n"
         "1. **Pest Analysis:** Categorize detected pests as 'Beneficial' or 'Harmful'. Apply the Pest Protocol rules.\n"
-        "2. **Disease Analysis:** Assess severity based on infection ratio.\n"
+        "2. **Disease Analysis:** Assess severity based on the pre-calculated infection ratio.\n"
         "3. **Plan:** Provide an integrated plan. If mixed infections (pests + disease) exists, prioritize the most severe threat but protect beneficial insects."
     )
 

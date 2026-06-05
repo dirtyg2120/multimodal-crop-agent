@@ -3,7 +3,7 @@ import asyncio
 import numpy as np
 import streamlit as st
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from groundingdino.util.inference import predict, load_model, annotate, load_image
 
@@ -30,13 +30,19 @@ def load_few_shot_engine():
     return FewShotEngine()
 
 
+MAX_AREA_RATIO = 0.95  # drop DINO boxes that cover ≥85% of the image (whole-image false detections)
+
 def extract_crops(image_source, boxes, phrases):
     h, w, _ = image_source.shape
+    img_area = h * w
     crops = []
     for box, phrase in zip(boxes, phrases):
         cx, cy, bw, bh = box.tolist()
         x1, y1 = max(0, int((cx - bw/2) * w)), max(0, int((cy - bh/2) * h))
         x2, y2 = min(w, int((cx + bw/2) * w)), min(h, int((cy + bh/2) * h))
+        box_area = (x2 - x1) * (y2 - y1)
+        if box_area / img_area >= MAX_AREA_RATIO:
+            continue  # skip whole-image boxes
         crop = image_source[y1:y2, x1:x2]
         if crop.size > 0 and (x2-x1) >= 10 and (y2-y1) >= 10:
             crops.append({"label": phrase, "crop": crop, "bbox": (x1, y1, x2, y2)})
@@ -54,40 +60,68 @@ def classify_with_fewshot(vision_system, few_shot_engine, crop_np):
     return label, conf, False
 
 
-def annotate_with_clip_labels(image_source, crops_data, detections):
+def annotate_with_clip_labels(image_source: np.ndarray, crops_data: list, detections: list) -> np.ndarray:
     """
-    Re-draws bounding boxes using CLIP-resolved labels instead of DINO's
-    generic 'leaf'/'bug' phrases.
-
-    detections: list of DetectedObject (label, confidence, box pixel coords, crop_id)
+    Color-coded: green=healthy, red=disease, orange=unknown, yellow=pest.
     """
-    h, w, _ = image_source.shape
+    if not detections:
+        return image_source
 
-    # Build tensors in the same format annotate() expects
-    boxes_list, logits_list, phrases_list = [], [], []
+    pil = Image.fromarray(image_source).convert("RGB")
+    draw = ImageDraw.Draw(pil, "RGBA")
+
+    # Use default PIL font (no external font needed)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    except Exception:
+        font = ImageFont.load_default()
+
     for obj in detections:
         x1, y1, x2, y2 = obj.box
-        # Convert pixel bbox → normalised cx, cy, bw, bh
-        cx = ((x1 + x2) / 2) / w
-        cy = ((y1 + y2) / 2) / h
-        bw = (x2 - x1) / w
-        bh = (y2 - y1) / h
-        boxes_list.append([cx, cy, bw, bh])
-        logits_list.append(obj.confidence)
-        phrases_list.append(obj.label)
+        label = obj.label
+        conf  = obj.confidence
 
-    if not boxes_list:
-        return image_source  # nothing to draw
+        # Box colour
+        if label == "Unknown":
+            color = (255, 140, 0)    # orange
+        elif "Healthy" in label:
+            color = (34, 197, 94)    # green
+        elif any(kw in crops_data[obj.crop_id]["label"].lower() for kw in ("bug", "worm", "pest")):
+            color = (234, 179, 8)    # yellow
+        else:
+            color = (239, 68, 68)    # red
 
-    boxes_t  = torch.tensor(boxes_list,  dtype=torch.float32)
-    logits_t = torch.tensor(logits_list, dtype=torch.float32)
+        # Draw box outline
+        draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
 
-    return annotate(
-        image_source=image_source,
-        boxes=boxes_t,
-        logits=logits_t,
-        phrases=phrases_list,
-    )
+        # Format: "<Crop>, <disease> %"
+        if label == "Unknown":
+            text = f"Unknown {conf:.0%}"
+        elif " leaf with " in label:
+            # e.g. "Tomato leaf with Early blight" → "Tomato, Early blight 87%"
+            crop, disease = label.split(" leaf with ", 1)
+            text = f"{crop}, {disease} {conf:.0%}"
+        elif label.startswith("Healthy "):
+            # e.g. "Healthy Tomato leaf" → "Tomato, Healthy 87%"
+            crop = label.replace("Healthy ", "").replace(" leaf", "")
+            text = f"{crop}, Healthy {conf:.0%}"
+        else:
+            text = f"{label} {conf:.0%}"
+
+        # Measure text size
+        bbox  = draw.textbbox((0, 0), text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        pad = 3
+
+        # Label background: inside top-left of the box
+        tx, ty = x1 + pad, y1 + pad
+        draw.rectangle(
+            [tx - pad, ty - pad, tx + tw + pad, ty + th + pad],
+            fill=(*color, 200),   # semi-transparent
+        )
+        draw.text((tx, ty), text, fill=(255, 255, 255), font=font)
+
+    return np.array(pil)
 
 
 def main():
