@@ -257,11 +257,24 @@ def main():
         k3.metric("Infection Ratio", f"{agent_json.infection_ratio:.0%}")
 
         with st.expander("Treatment Plan", expanded=True):
-            st.info(f"**Reasoning:** {agent_json.reasoning}")
-            for action in agent_json.recommended_actions:
-                st.write(f"- {action}")
+            # Normalize reasoning: split into readable paragraphs
+            reasoning = agent_json.reasoning.strip()
+            # Split on numbered steps (e.g. "1.", "2.") or double newlines
+            import re
+            paragraphs = re.split(r'\n{2,}|(?<=\.)\s*(?=\d+[\.\)])', reasoning)
+            paragraphs = [p.strip() for p in paragraphs if p.strip()]
+            st.info("**Reasoning:**")
+            for p in paragraphs:
+                st.markdown(f"> {p}")
+
+            # Render actions as a numbered list
+            st.markdown("**Recommended Actions:**")
+            for i, action in enumerate(agent_json.recommended_actions, 1):
+                action = action.strip().lstrip("-•* ").strip()
+                st.markdown(f"{i}. {action}")
+
             if agent_json.required_pesticides:
-                st.warning(f"💊 Chemicals: {', '.join(agent_json.required_pesticides)}")
+                st.warning(f"💊 **Chemicals:** {', '.join(agent_json.required_pesticides)}")
 
         with st.expander("Individual Detections"):
             for obj in results["detections"]:
